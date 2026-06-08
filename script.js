@@ -18,8 +18,7 @@ const files = [
     description: 'Правила и порядок комплектации.',
     category: 'Комплектация',
     categoryName: 'Комплектация',
-    path: 'files/Инструкция по комплектации.pdf'
-     
+    path: 'files/Инструкция по комплектации.pdf'     
   }   
 ];
 
