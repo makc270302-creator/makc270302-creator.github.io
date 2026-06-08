@@ -19,6 +19,7 @@ const files = [
     category: 'Комплектация',
     categoryName: 'Комплектация',
     path: 'files/Инструкция по комплектации.pdf'
+     
   }   
 ];
 
