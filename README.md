@@ -16,7 +16,6 @@
       <div class="hero__badge">PDF</div>
     </div>
   </header>
-
   <main class="container">
     <section class="toolbar">
       <div class="search-box">
