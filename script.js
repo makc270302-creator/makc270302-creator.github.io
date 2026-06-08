@@ -20,14 +20,7 @@ const files = [
     category: 'Комплектация',
     categoryName: 'Комплектация',
     path: 'files/Инструкция по комплектации.pdf'     
-  },
-   {
-    title: 'Инструкция по комплектации213',
-    description: 'Правила и порядок комплектации.',
-    category: 'Комплектация',
-    categoryName: 'Комплектация',
-    path: 'files/Инструкция по комплектации.pdf'     
-  }   
+  }     
 ];
 
 const fileList = document.getElementById('fileList');
