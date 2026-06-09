@@ -8,7 +8,8 @@ const CATEGORY_ICONS = {
   'Потери': '📉',
   'Охрана труда': '🦺',
   'Пожарная безопасность': '🔥',
-  'Зарядная станция': '⚡'
+  'Зарядная станция': '⚡',
+  'Проверка и формирование': '📋'
 };
 
 const fileList = document.getElementById('fileList');
@@ -34,7 +35,7 @@ function normalizeText(value) {
 }
 
 function getCategoryIcon(category) {
-  return CATEGORY_ICONS[category] || '📋';
+  return CATEGORY_ICONS[category] || '📑';
 }
 
 function sortFiles() {
