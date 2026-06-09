@@ -183,6 +183,23 @@ select {
   font-size: 13px;
 }
 
+
+.meta {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  line-height: 1.35;
+}
+
+.meta span {
+  font-weight: 700;
+  color: var(--text);
+}
+
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
