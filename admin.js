@@ -8,7 +8,7 @@ const CONFIG = {
 };
 
 // Простая блокировка интерфейса. Настоящую защиту даёт GitHub token.
-const ADMIN_PASSWORD = 'admin123';
+const ADMIN_PASSWORD = '147963';
 
 const loginPanel = document.getElementById('loginPanel');
 const uploadPanel = document.getElementById('uploadPanel');
