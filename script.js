@@ -41,6 +41,8 @@ const files = [
   }
 ];
 
+files.sort((a, b) => a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' }));
+
 const fileList = document.getElementById('fileList');
 const searchInput = document.getElementById('searchInput');
 const categoryFilter = document.getElementById('categoryFilter');
@@ -48,7 +50,10 @@ const filesCount = document.getElementById('filesCount');
 const emptyState = document.getElementById('emptyState');
 
 function setupCategories() {
-  const categories = ['Все категории', ...new Set(files.map((file) => file.category))];
+  const uniqueCategories = [...new Set(files.map((file) => file.category))]
+    .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
+
+  const categories = ['Все категории', ...uniqueCategories];
 
   categoryFilter.innerHTML = '';
 
