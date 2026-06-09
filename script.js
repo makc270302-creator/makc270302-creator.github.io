@@ -4,7 +4,7 @@ let changelog = [];
 const CATEGORY_ICONS = {
   '1С': '🖥️',
   'Склад': '📦',
-  'Комплектация': '📋',
+  'Комплектация': '📦',
   'Потери': '📉',
   'Охрана труда': '🦺',
   'Пожарная безопасность': '🔥',
@@ -34,7 +34,7 @@ function normalizeText(value) {
 }
 
 function getCategoryIcon(category) {
-  return CATEGORY_ICONS[category] || '📄';
+  return CATEGORY_ICONS[category] || '📋';
 }
 
 function sortFiles() {
