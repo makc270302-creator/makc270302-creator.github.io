@@ -1,47 +1,4 @@
-const files = [
-  {
-    title: 'Реестр расходных накладных',
-    description: 'Инструкция по работе с реестром расходных накладных в 1С.',
-    category: '1С',
-    author: 'Менеджер по стандартизации Ромашов М.С.',
-    uploadDate: '09.06.2026',
-    path: 'files/Реестр расходных накладных.pdf'
-  },
-  {
-    title: 'Расходные накладные',
-    description: 'Просмотр, поиск и контроль расходных накладных.',
-    category: '1С',
-    author: 'Менеджер по стандартизации Ромашов М.С.',
-    uploadDate: '09.06.2026',
-    path: 'files/Расходные накладные.pdf'
-  },
-  {
-    title: 'Расходная накладная',
-    description: 'Подробная информация по накладной, операциям, истории изменений и данным развоза.',
-    category: '1С',
-    author: 'Менеджер по стандартизации Ромашов М.С.',
-    uploadDate: '09.06.2026',
-    path: 'files/Расходная накладная.pdf'
-  },
-  {
-    title: 'Приходные накладные',
-    description: 'Порядок работы с приходными документами и операциями.',
-    category: '1С',
-    author: 'Менеджер по стандартизации Ромашов М.С.',
-    uploadDate: '09.06.2026',
-    path: 'files/Приходные накладные.pdf'
-  },
-  {
-    title: 'Инструкция по комплектации',
-    description: 'Правила и порядок комплектации.',
-    category: 'Комплектация',
-    author: 'Менеджер по стандартизации Ромашов М.С.',
-    uploadDate: '09.06.2026',
-    path: 'files/Инструкция по комплектации.pdf'
-  }
-];
-
-files.sort((a, b) => a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' }));
+let files = [];
 
 const fileList = document.getElementById('fileList');
 const searchInput = document.getElementById('searchInput');
@@ -49,15 +6,18 @@ const categoryFilter = document.getElementById('categoryFilter');
 const filesCount = document.getElementById('filesCount');
 const emptyState = document.getElementById('emptyState');
 
+function sortFiles() {
+  files.sort((a, b) => a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' }));
+}
+
 function setupCategories() {
   const uniqueCategories = [...new Set(files.map((file) => file.category))]
+    .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
-
-  const categories = ['Все категории', ...uniqueCategories];
 
   categoryFilter.innerHTML = '';
 
-  categories.forEach((category) => {
+  ['Все категории', ...uniqueCategories].forEach((category) => {
     const option = document.createElement('option');
     option.value = category;
     option.textContent = category;
@@ -96,7 +56,7 @@ function renderFiles() {
       <h2>${file.title}</h2>
       <p>${file.description}</p>
       <div class="meta">
-        <div><span>Автор:</span> ${file.author}</div>
+        <div><span>👤 Автор:</span> ${file.author}</div>
         <div><span>📅 Дата загрузки:</span> ${file.uploadDate}</div>
       </div>
       <div class="actions">
@@ -109,7 +69,24 @@ function renderFiles() {
   });
 }
 
-setupCategories();
+async function loadDocuments() {
+  try {
+    const response = await fetch('documents.json?v=' + Date.now());
+
+    if (!response.ok) {
+      throw new Error('Не удалось загрузить documents.json');
+    }
+
+    files = await response.json();
+    sortFiles();
+    setupCategories();
+    renderFiles();
+  } catch (error) {
+    fileList.innerHTML = `<div class="empty-state"><h2>Ошибка загрузки списка</h2><p>${error.message}</p></div>`;
+    filesCount.textContent = '0 / 0';
+  }
+}
+
 searchInput.addEventListener('input', renderFiles);
 categoryFilter.addEventListener('change', renderFiles);
-renderFiles();
+loadDocuments();

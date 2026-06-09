@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Добавить PDF-инструкцию</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero hero--small">
+    <div class="hero__content">
+      <div>
+        <p class="eyebrow">Администрирование базы документов</p>
+        <h1>Добавить PDF</h1>
+        <p class="hero__text">Загрузка документа в GitHub Pages через GitHub API.</p>
+      </div>
+      <a class="admin-button admin-button--light" href="index.html">← На главную</a>
+    </div>
+  </header>
+
+  <main class="container admin-container">
+    <section class="admin-panel" id="loginPanel">
+      <h2>🔐 Вход</h2>
+      <p class="muted">Введите пароль администратора. Его можно заменить в файле <code>admin.js</code>.</p>
+      <label>
+        Пароль
+        <input id="adminPassword" type="password" placeholder="Введите пароль" />
+      </label>
+      <button id="loginButton" class="primary-button">Войти</button>
+    </section>
+
+    <section class="admin-panel" id="uploadPanel" hidden>
+      <h2>⬆️ Новый документ</h2>
+      <p class="muted">GitHub token вводится вручную и нужен только для записи в репозиторий. Не публикуйте токен в коде сайта.</p>
+
+      <label>
+        GitHub token
+        <input id="githubToken" type="password" placeholder="github_pat_..." autocomplete="off" />
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Название документа
+          <input id="docTitle" type="text" placeholder="Например: Возвраты поставщикам" />
+        </label>
+
+        <label>
+          Категория
+          <input id="docCategory" type="text" placeholder="Например: 1С" value="1С" />
+        </label>
+      </div>
+
+      <label>
+        Описание
+        <textarea id="docDescription" rows="4" placeholder="Кратко опишите назначение инструкции"></textarea>
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Автор
+          <input id="docAuthor" type="text" value="Менеджер по стандартизации Ромашов М.С." />
+        </label>
+
+        <label>
+          Дата загрузки
+          <input id="docDate" type="text" />
+        </label>
+      </div>
+
+      <label>
+        PDF-файл
+        <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
+      </label>
+
+      <button id="uploadButton" class="primary-button">Загрузить документ</button>
+
+      <div id="statusBox" class="status-box" hidden></div>
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>
