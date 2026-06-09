@@ -1,3 +1,2 @@
-theme: 
-title: База знаний ООО "Разгуляй"
-description: 
+include:
+  - files

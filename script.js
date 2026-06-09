@@ -3,30 +3,31 @@ const files = [
     title: 'Реестр расходных накладных',
     description: 'Инструкция по работе с реестром расходных накладных в 1С.',
     category: '1С',
-    categoryName: '1С',
     path: 'files/Реестр расходных накладных.pdf'
   },
-  
+  {
+    title: 'Расходные накладные',
+    description: 'Просмотр, поиск и контроль расходных накладных.',
+    category: '1С',
+    path: 'files/Расходные накладные.pdf'
+  },
+  {
+    title: 'Расходная накладная',
+    description: 'Подробная информация по накладной, операциям, истории изменений и данным развоза.',
+    category: '1С',
+    path: 'files/Расходная накладная.pdf'
+  },
   {
     title: 'Приходные накладные',
     description: 'Порядок работы с приходными документами и операциями.',
     category: '1С',
-    categoryName: '1С',
     path: 'files/Приходные накладные.pdf'
   },
-   {
+  {
     title: 'Инструкция по комплектации',
     description: 'Правила и порядок комплектации.',
     category: 'Комплектация',
-    categoryName: 'Комплектация',
-    path: 'files/Инструкция по комплектации.pdf'     
-  },
-    {
-    title: 'Инструкция по комплектации213213',
-    description: 'Правила и порядок комплектации.',
-    category: 'Комплектация',
-    categoryName: 'Комплектация',
-    path: 'files/Инструкция по комплектации.pdf'     
+    path: 'files/Инструкция по комплектации.pdf'
   }
 ];
 
@@ -36,6 +37,19 @@ const categoryFilter = document.getElementById('categoryFilter');
 const filesCount = document.getElementById('filesCount');
 const emptyState = document.getElementById('emptyState');
 
+function setupCategories() {
+  const categories = ['Все категории', ...new Set(files.map((file) => file.category))];
+
+  categoryFilter.innerHTML = '';
+
+  categories.forEach((category) => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = category;
+    categoryFilter.appendChild(option);
+  });
+}
+
 function renderFiles() {
   const search = searchInput.value.toLowerCase().trim();
   const category = categoryFilter.value;
@@ -43,7 +57,8 @@ function renderFiles() {
   const filteredFiles = files.filter((file) => {
     const matchesSearch =
       file.title.toLowerCase().includes(search) ||
-      file.description.toLowerCase().includes(search);
+      file.description.toLowerCase().includes(search) ||
+      file.category.toLowerCase().includes(search);
 
     const matchesCategory = category === 'Все категории' || file.category === category;
 
@@ -51,7 +66,7 @@ function renderFiles() {
   });
 
   fileList.innerHTML = '';
-  filesCount.textContent = filteredFiles.length;
+  filesCount.textContent = `${filteredFiles.length} / ${files.length}`;
   emptyState.hidden = filteredFiles.length > 0;
 
   filteredFiles.forEach((file) => {
@@ -60,12 +75,12 @@ function renderFiles() {
 
     card.innerHTML = `
       <div class="file-icon">PDF</div>
-      <span class="tag">${file.categoryName}</span>
+      <span class="tag">${file.category}</span>
       <h2>${file.title}</h2>
       <p>${file.description}</p>
       <div class="actions">
-        <a class="open-link" href="${file.path}" target="_blank">Открыть</a>
-        <a class="download-link" href="${file.path}" download>Скачать</a>
+        <a class="open-link" href="${encodeURI(file.path)}" target="_blank" rel="noopener">Открыть</a>
+        <a class="download-link" href="${encodeURI(file.path)}" download>Скачать</a>
       </div>
     `;
 
@@ -73,7 +88,7 @@ function renderFiles() {
   });
 }
 
+setupCategories();
 searchInput.addEventListener('input', renderFiles);
 categoryFilter.addEventListener('change', renderFiles);
-
 renderFiles();
