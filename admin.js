@@ -50,22 +50,7 @@ let cachedDocuments = [];
 let cachedDocumentsSha = null;
 let cachedChangelog = [];
 let cachedChangelogSha = null;
-let isAuthenticated = false;
-
-function requireAuth() {
-  if (!isAuthenticated) {
-    throw new Error('Сначала войдите по паролю администратора.');
-  }
-}
-
-function lockAdminPanels() {
-  loginPanel.hidden = false;
-  uploadPanel.hidden = true;
-  managePanel.hidden = true;
-  editPanel.hidden = true;
-}
-
-lockAdminPanels();
+let isAdminAuthenticated = false;
 
 function todayRu() {
   return new Date().toLocaleDateString('ru-RU');
@@ -84,7 +69,30 @@ function hideStatus(element) {
   element.innerHTML = '';
 }
 
+function requireAdmin() {
+  if (!isAdminAuthenticated) {
+    throw new Error('Сначала введите пароль администратора.');
+  }
+}
+
+function lockAdminPanels() {
+  isAdminAuthenticated = false;
+  loginPanel.hidden = false;
+  uploadPanel.hidden = true;
+  managePanel.hidden = true;
+  editPanel.hidden = true;
+}
+
+function unlockAdminPanels() {
+  isAdminAuthenticated = true;
+  loginPanel.hidden = true;
+  uploadPanel.hidden = false;
+  managePanel.hidden = false;
+  editPanel.hidden = true;
+}
+
 function requireToken() {
+  requireAdmin();
   const token = githubToken.value.trim();
   if (!token) throw new Error('Введите GitHub token.');
   return token;
@@ -270,6 +278,7 @@ function validateEditForm() {
 }
 
 function renderManageList() {
+  if (!isAdminAuthenticated) return;
   manageList.innerHTML = '';
 
   if (!cachedDocuments.length) {
@@ -297,6 +306,7 @@ function renderManageList() {
 }
 
 async function refreshDocumentsList() {
+  requireAdmin();
   const token = requireToken();
   showStatus(manageStatusBox, '⏳ Загружаю список документов...', 'info');
   const loaded = await loadDocumentsFromGitHub(token);
@@ -307,6 +317,7 @@ async function refreshDocumentsList() {
 }
 
 function fillEditForm(documentItem) {
+  requireAdmin();
   editOriginalPath.value = documentItem.path;
   editTitle.value = documentItem.title || '';
   editDescription.value = documentItem.description || '';
@@ -322,18 +333,22 @@ function fillEditForm(documentItem) {
 
 loginButton.addEventListener('click', () => {
   if (adminPassword.value !== ADMIN_PASSWORD) {
+    lockAdminPanels();
     alert('Неверный пароль');
     return;
   }
 
-  isAuthenticated = true;
-  loginPanel.hidden = true;
-  uploadPanel.hidden = false;
-  managePanel.hidden = false;
+  unlockAdminPanels();
 });
 
 uploadButton.addEventListener('click', async () => {
-  try { requireAuth(); } catch (error) { showStatus(statusBox, `⚠️ ${error.message}`, 'error'); return; }
+  try {
+    requireAdmin();
+  } catch (error) {
+    showStatus(statusBox, `🔐 ${error.message}`, 'error');
+    return;
+  }
+
   const validationError = validateUploadForm();
   if (validationError) {
     showStatus(statusBox, `⚠️ ${validationError}`, 'error');
@@ -406,7 +421,7 @@ uploadButton.addEventListener('click', async () => {
 
 loadDocumentsButton.addEventListener('click', async () => {
   try {
-    requireAuth();
+    requireAdmin();
     loadDocumentsButton.disabled = true;
     await refreshDocumentsList();
   } catch (error) {
@@ -417,7 +432,13 @@ loadDocumentsButton.addEventListener('click', async () => {
 });
 
 manageList.addEventListener('click', async (event) => {
-  try { requireAuth(); } catch (error) { showStatus(manageStatusBox, `⚠️ ${error.message}`, 'error'); return; }
+  try {
+    requireAdmin();
+  } catch (error) {
+    showStatus(manageStatusBox, `🔐 ${error.message}`, 'error');
+    return;
+  }
+
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -469,7 +490,13 @@ manageList.addEventListener('click', async (event) => {
 });
 
 saveEditButton.addEventListener('click', async () => {
-  try { requireAuth(); } catch (error) { showStatus(manageStatusBox, `⚠️ ${error.message}`, 'error'); return; }
+  try {
+    requireAdmin();
+  } catch (error) {
+    showStatus(manageStatusBox, `🔐 ${error.message}`, 'error');
+    return;
+  }
+
   const validationError = validateEditForm();
   if (validationError) {
     showStatus(manageStatusBox, `⚠️ ${validationError}`, 'error');
@@ -521,11 +548,10 @@ saveEditButton.addEventListener('click', async () => {
 });
 
 cancelEditButton.addEventListener('click', () => {
+  if (!isAdminAuthenticated) return;
   editPanel.hidden = true;
   hideStatus(manageStatusBox);
 });
 
-
-adminPassword.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') loginButton.click();
-});
+// При открытии страницы админские действия всегда заблокированы до ввода пароля.
+lockAdminPanels();
