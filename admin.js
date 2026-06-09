@@ -50,6 +50,22 @@ let cachedDocuments = [];
 let cachedDocumentsSha = null;
 let cachedChangelog = [];
 let cachedChangelogSha = null;
+let isAuthenticated = false;
+
+function requireAuth() {
+  if (!isAuthenticated) {
+    throw new Error('Сначала войдите по паролю администратора.');
+  }
+}
+
+function lockAdminPanels() {
+  loginPanel.hidden = false;
+  uploadPanel.hidden = true;
+  managePanel.hidden = true;
+  editPanel.hidden = true;
+}
+
+lockAdminPanels();
 
 function todayRu() {
   return new Date().toLocaleDateString('ru-RU');
@@ -310,12 +326,14 @@ loginButton.addEventListener('click', () => {
     return;
   }
 
+  isAuthenticated = true;
   loginPanel.hidden = true;
   uploadPanel.hidden = false;
   managePanel.hidden = false;
 });
 
 uploadButton.addEventListener('click', async () => {
+  try { requireAuth(); } catch (error) { showStatus(statusBox, `⚠️ ${error.message}`, 'error'); return; }
   const validationError = validateUploadForm();
   if (validationError) {
     showStatus(statusBox, `⚠️ ${validationError}`, 'error');
@@ -388,6 +406,7 @@ uploadButton.addEventListener('click', async () => {
 
 loadDocumentsButton.addEventListener('click', async () => {
   try {
+    requireAuth();
     loadDocumentsButton.disabled = true;
     await refreshDocumentsList();
   } catch (error) {
@@ -398,6 +417,7 @@ loadDocumentsButton.addEventListener('click', async () => {
 });
 
 manageList.addEventListener('click', async (event) => {
+  try { requireAuth(); } catch (error) { showStatus(manageStatusBox, `⚠️ ${error.message}`, 'error'); return; }
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -449,6 +469,7 @@ manageList.addEventListener('click', async (event) => {
 });
 
 saveEditButton.addEventListener('click', async () => {
+  try { requireAuth(); } catch (error) { showStatus(manageStatusBox, `⚠️ ${error.message}`, 'error'); return; }
   const validationError = validateEditForm();
   if (validationError) {
     showStatus(manageStatusBox, `⚠️ ${validationError}`, 'error');
@@ -502,4 +523,9 @@ saveEditButton.addEventListener('click', async () => {
 cancelEditButton.addEventListener('click', () => {
   editPanel.hidden = true;
   hideStatus(manageStatusBox);
+});
+
+
+adminPassword.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') loginButton.click();
 });
