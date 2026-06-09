@@ -3,78 +3,119 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Добавить PDF-инструкцию</title>
+  <title>Управление документами</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="hero hero--small">
+  <header class="hero">
     <div class="hero__content">
       <div>
-        <p class="eyebrow">Администрирование базы документов</p>
-        <h1>Добавить PDF</h1>
-        <p class="hero__text">Загрузка документа в GitHub Pages через GitHub API.</p>
+        <p class="eyebrow">Админ-панель</p>
+        <h1>Управление PDF</h1>
+        <p class="hero__text">Добавление, редактирование и удаление карточек документов через GitHub API.</p>
       </div>
-      <a class="admin-button admin-button--light" href="index.html">← На главную</a>
+      <div class="hero__actions"><a class="admin-button" href="index.html">← На главную</a></div>
     </div>
   </header>
 
-  <main class="container admin-container">
-    <section class="admin-panel" id="loginPanel">
+  <main class="container admin-page">
+    <section id="loginPanel" class="section-block admin-card">
       <h2>🔐 Вход</h2>
-      <p class="muted">Введите пароль администратора. Его можно заменить в файле <code>admin.js</code>.</p>
-      <label>
-        Пароль
-        <input id="adminPassword" type="password" placeholder="Введите пароль" />
-      </label>
-      <button id="loginButton" class="primary-button">Войти</button>
+      <p>Введите пароль администратора.</p>
+      <label>Пароль</label>
+      <input id="adminPassword" type="password" placeholder="Пароль" />
+      <button id="loginButton" type="button">Войти</button>
     </section>
 
-    <section class="admin-panel" id="uploadPanel" hidden>
+    <section id="uploadPanel" class="section-block admin-card" hidden>
       <h2>⬆️ Новый документ</h2>
-      <p class="muted">GitHub token вводится вручную и нужен только для записи в репозиторий. Не публикуйте токен в коде сайта.</p>
+      <p>GitHub token не сохраняется на сайте. Его нужно вводить вручную при загрузке, редактировании или удалении.</p>
 
-      <label>
-        GitHub token
-        <input id="githubToken" type="password" placeholder="github_pat_..." autocomplete="off" />
-      </label>
+      <label>GitHub token</label>
+      <input id="githubToken" type="password" placeholder="github_pat_..." />
 
-      <div class="form-grid">
-        <label>
-          Название документа
-          <input id="docTitle" type="text" placeholder="Например: Возвраты поставщикам" />
-        </label>
+      <label>Название документа</label>
+      <input id="docTitle" type="text" placeholder="Например: Вычерк" />
 
-        <label>
-          Категория
-          <input id="docCategory" type="text" placeholder="Например: 1С" value="1С" />
-        </label>
-      </div>
+      <label>Описание</label>
+      <textarea id="docDescription" rows="4" placeholder="Краткое описание инструкции"></textarea>
 
-      <label>
-        Описание
-        <textarea id="docDescription" rows="4" placeholder="Кратко опишите назначение инструкции"></textarea>
-      </label>
+      <label>Категория</label>
+      <input id="docCategory" type="text" list="categorySuggestions" placeholder="Например: 1С" />
+      <datalist id="categorySuggestions">
+        <option value="1С"></option>
+        <option value="Склад"></option>
+        <option value="Комплектация"></option>
+        <option value="Потери"></option>
+        <option value="Охрана труда"></option>
+        <option value="Пожарная безопасность"></option>
+        <option value="Зарядная станция"></option>
+      </datalist>
 
-      <div class="form-grid">
-        <label>
-          Автор
-          <input id="docAuthor" type="text" value="Менеджер по стандартизации Ромашов М.С." />
-        </label>
+      <label>Автор</label>
+      <input id="docAuthor" type="text" value="Менеджер по стандартизации Ромашов М.С." />
 
-        <label>
-          Дата загрузки
-          <input id="docDate" type="text" />
-        </label>
-      </div>
+      <label>Дата загрузки</label>
+      <input id="docDate" type="text" />
 
-      <label>
-        PDF-файл
-        <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
-      </label>
+      <label>Версия документа</label>
+      <input id="docVersion" type="text" value="1.0" />
 
-      <button id="uploadButton" class="primary-button">Загрузить документ</button>
+      <label class="checkbox-row"><input id="docPopular" type="checkbox" /> Добавить в часто используемые</label>
 
+      <label>PDF-файл</label>
+      <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
+
+      <button id="uploadButton" type="button">Загрузить документ</button>
       <div id="statusBox" class="status-box" hidden></div>
+    </section>
+
+    <section id="managePanel" class="section-block admin-card" hidden>
+      <div class="admin-section-title">
+        <div>
+          <h2>🗂️ Редактирование и удаление</h2>
+          <p>Загрузите список документов, затем выберите нужную карточку.</p>
+        </div>
+        <button id="loadDocumentsButton" type="button">Обновить список</button>
+      </div>
+
+      <div id="manageList" class="manage-list"></div>
+      <div id="manageStatusBox" class="status-box" hidden></div>
+    </section>
+
+    <section id="editPanel" class="section-block admin-card" hidden>
+      <h2>✏️ Редактировать карточку</h2>
+      <p>Меняются только данные карточки. Сам PDF не перезагружается.</p>
+
+      <input id="editOriginalPath" type="hidden" />
+
+      <label>Название документа</label>
+      <input id="editTitle" type="text" />
+
+      <label>Описание</label>
+      <textarea id="editDescription" rows="4"></textarea>
+
+      <label>Категория</label>
+      <input id="editCategory" type="text" list="categorySuggestions" />
+
+      <label>Автор</label>
+      <input id="editAuthor" type="text" />
+
+      <label>Дата загрузки</label>
+      <input id="editUploadDate" type="text" />
+
+      <label>Дата обновления</label>
+      <input id="editUpdatedDate" type="text" />
+
+      <label>Версия документа</label>
+      <input id="editVersion" type="text" />
+
+      <label class="checkbox-row"><input id="editPopular" type="checkbox" /> Часто используемый документ</label>
+
+      <div class="admin-form-actions">
+        <button id="saveEditButton" type="button">Сохранить изменения</button>
+        <button id="cancelEditButton" class="secondary-button" type="button">Отмена</button>
+      </div>
     </section>
   </main>
 
