@@ -199,7 +199,7 @@
     "uploadDate": "10.06.2026",
     "updatedDate": "10.06.2026",
     "version": "1.0",
-    "popular": true,
+    "popular": false,
     "icon": "",
     "path": "files/Статистика по доставке.pdf"
   },
