@@ -17,6 +17,7 @@ const CONFIG = {
   branch: 'main',
   documentsPath: 'documents.json',
   changelogPath: 'changelog.json',
+  categoriesPath: 'categories.json',
   filesFolder: 'files'
 };
 
@@ -48,9 +49,17 @@ const editPopular = document.getElementById('editPopular');
 const editPdfFile = document.getElementById('editPdfFile');
 const saveEditButton = document.getElementById('saveEditButton');
 const cancelEditButton = document.getElementById('cancelEditButton');
+const editArchived = document.getElementById('editArchived');
+const categorySuggestions = document.getElementById('categorySuggestions');
+const categoryName = document.getElementById('categoryName');
+const categoryIcon = document.getElementById('categoryIcon');
+const addCategoryButton = document.getElementById('addCategoryButton');
+const categoryList = document.getElementById('categoryList');
+const categoryStatusBox = document.getElementById('categoryStatusBox');
 
 let cachedDocuments = [];
 let cachedChangelog = [];
+let cachedCategories = [];
 
 docDate.value = todayRu();
 
@@ -107,9 +116,10 @@ async function getRepositoryFile(path, token) {
 }
 
 async function loadRepositoryData(token) {
-  const [documentsFile, changelogFile] = await Promise.all([
+  const [documentsFile, changelogFile, categoriesFile] = await Promise.all([
     getRepositoryFile(CONFIG.documentsPath, token),
-    getRepositoryFile(CONFIG.changelogPath, token)
+    getRepositoryFile(CONFIG.changelogPath, token),
+    getRepositoryFile(CONFIG.categoriesPath, token)
   ]);
 
   const documents = JSON.parse(base64ToText(documentsFile.content));
@@ -121,7 +131,8 @@ async function loadRepositoryData(token) {
 
   return {
     documents: sortDocuments(documents),
-    changelog: JSON.parse(base64ToText(changelogFile.content))
+    changelog: JSON.parse(base64ToText(changelogFile.content)),
+    categories: JSON.parse(base64ToText(categoriesFile.content))
   };
 }
 
@@ -214,6 +225,7 @@ function renderManageList() {
     appendTextElement(content, 'strong', documentItem.title || 'Без названия');
     appendTextElement(content, 'p', documentItem.description || '');
     appendTextElement(content, 'small', `${documentItem.category} · версия ${documentItem.version} · ${documentItem.updatedDate}`);
+    if (documentItem.archived) appendTextElement(content, 'small', 'Архивный документ', 'archive-note');
     item.appendChild(content);
 
     const actions = document.createElement('div');
@@ -222,6 +234,10 @@ function renderManageList() {
     editButton.type = 'button';
     editButton.dataset.action = 'edit';
     editButton.dataset.path = documentItem.path;
+    const archiveButton = appendTextElement(actions, 'button', documentItem.archived ? 'Вернуть' : 'В архив', 'secondary-button');
+    archiveButton.type = 'button';
+    archiveButton.dataset.action = 'archive';
+    archiveButton.dataset.path = documentItem.path;
     const deleteButton = appendTextElement(actions, 'button', 'Удалить', 'danger-button');
     deleteButton.type = 'button';
     deleteButton.dataset.action = 'delete';
@@ -231,13 +247,37 @@ function renderManageList() {
   }
 }
 
+function renderCategories() {
+  categorySuggestions.replaceChildren();
+  categoryList.replaceChildren();
+
+  for (const category of cachedCategories) {
+    const option = document.createElement('option');
+    option.value = category.name;
+    categorySuggestions.appendChild(option);
+
+    const item = document.createElement('article');
+    item.className = 'manage-item';
+    appendTextElement(item, 'strong', `${category.icon || '📑'} ${category.name}`);
+    const actions = document.createElement('div');
+    actions.className = 'manage-actions';
+    const deleteButton = appendTextElement(actions, 'button', 'Удалить', 'danger-button');
+    deleteButton.type = 'button';
+    deleteButton.dataset.category = category.name;
+    item.appendChild(actions);
+    categoryList.appendChild(item);
+  }
+}
+
 async function refreshDocumentsList({ quiet = false } = {}) {
   const token = requireToken();
   if (!quiet) showStatus(manageStatusBox, 'Загружаю список документов...', 'info');
   const loaded = await loadRepositoryData(token);
   cachedDocuments = loaded.documents;
   cachedChangelog = loaded.changelog;
+  cachedCategories = loaded.categories;
   renderManageList();
+  renderCategories();
   showStatus(manageStatusBox, `Список загружен. Документов: ${cachedDocuments.length}`, 'success');
 }
 
@@ -251,6 +291,7 @@ function fillEditForm(documentItem) {
   editUpdatedDate.value = todayRu();
   editVersion.value = documentItem.version || '1.0';
   editPopular.checked = Boolean(documentItem.popular);
+  editArchived.checked = Boolean(documentItem.archived);
   editPdfFile.value = '';
   editPanel.hidden = false;
   editTitle.focus();
@@ -279,8 +320,10 @@ logoutButton.addEventListener('click', () => {
   githubToken.value = '';
   cachedDocuments = [];
   cachedChangelog = [];
+  cachedCategories = [];
   editPanel.hidden = true;
   renderManageList();
+  renderCategories();
   hideStatus(statusBox);
   showStatus(manageStatusBox, 'Токен очищен из текущей вкладки.', 'info');
   githubToken.focus();
@@ -312,8 +355,12 @@ uploadButton.addEventListener('click', async () => {
     const loaded = await loadRepositoryData(token);
     cachedDocuments = loaded.documents;
     cachedChangelog = loaded.changelog;
+    cachedCategories = loaded.categories;
 
     const title = docTitle.value.trim();
+    if (!cachedCategories.some((category) => category.name === docCategory.value.trim())) {
+      throw new Error('Выберите существующую категорию или сначала добавьте новую.');
+    }
     const path = `${CONFIG.filesFolder}/${sanitizeFileName(title)}.pdf`;
     const duplicate = cachedDocuments.find((item) =>
       normalizeText(item.title) === normalizeText(title) || item.path === path
@@ -332,6 +379,7 @@ uploadButton.addEventListener('click', async () => {
       updatedDate: docDate.value.trim(),
       version: docVersion.value.trim(),
       popular: docPopular.checked,
+      archived: false,
       icon: '',
       path
     };
@@ -376,6 +424,41 @@ manageList.addEventListener('click', async (event) => {
     return;
   }
 
+  if (button.dataset.action === 'archive') {
+    button.disabled = true;
+    try {
+      const token = requireToken();
+      const loaded = await loadRepositoryData(token);
+      cachedDocuments = loaded.documents;
+      cachedChangelog = loaded.changelog;
+      cachedCategories = loaded.categories;
+      const latestDocument = cachedDocuments.find((item) => item.path === documentItem.path);
+      if (!latestDocument) throw new Error('Документ не найден. Обновите список и попробуйте снова.');
+      const archived = !Boolean(latestDocument.archived);
+      const documents = sortDocuments(cachedDocuments.map((item) =>
+        item.path === documentItem.path ? { ...item, archived, updatedDate: todayRu() } : item
+      ));
+      const changelog = nextChangelog({
+        date: todayRu(),
+        title: `${archived ? 'Архивирован' : 'Возвращён из архива'} документ: ${documentItem.title}`,
+        description: documentItem.description
+      });
+      await createAtomicCommit([
+        jsonChange(CONFIG.documentsPath, documents),
+        jsonChange(CONFIG.changelogPath, changelog)
+      ], `${archived ? 'Архивирован' : 'Восстановлен'} документ: ${documentItem.title}`, token);
+      cachedDocuments = documents;
+      cachedChangelog = changelog;
+      renderManageList();
+      showStatus(manageStatusBox, archived ? 'Документ перемещён в архив.' : 'Документ возвращён из архива.', 'success');
+    } catch (error) {
+      showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error');
+    } finally {
+      button.disabled = false;
+    }
+    return;
+  }
+
   if (!confirm(`Удалить документ «${documentItem.title}» и его PDF?`)) return;
 
   button.disabled = true;
@@ -384,6 +467,7 @@ manageList.addEventListener('click', async (event) => {
     const loaded = await loadRepositoryData(token);
     cachedDocuments = loaded.documents;
     cachedChangelog = loaded.changelog;
+    cachedCategories = loaded.categories;
     const documents = cachedDocuments.filter((item) => item.path !== documentItem.path);
     const changelog = nextChangelog({
       date: todayRu(),
@@ -422,8 +506,12 @@ saveEditButton.addEventListener('click', async () => {
     const loaded = await loadRepositoryData(token);
     cachedDocuments = loaded.documents;
     cachedChangelog = loaded.changelog;
+    cachedCategories = loaded.categories;
 
     const originalPath = editOriginalPath.value;
+    if (!cachedCategories.some((category) => category.name === editCategory.value.trim())) {
+      throw new Error('Выберите существующую категорию или сначала добавьте новую.');
+    }
     const existingDocument = cachedDocuments.find((item) => item.path === originalPath);
     if (!existingDocument) throw new Error('Документ не найден. Обновите список и попробуйте снова.');
 
@@ -441,7 +529,8 @@ saveEditButton.addEventListener('click', async () => {
       uploadDate: editUploadDate.value.trim(),
       updatedDate: editUpdatedDate.value.trim(),
       version: editVersion.value.trim(),
-      popular: editPopular.checked
+      popular: editPopular.checked,
+      archived: editArchived.checked
     };
     const documents = sortDocuments(cachedDocuments.map((item) =>
       item.path === originalPath ? updatedDocument : item
@@ -479,3 +568,77 @@ cancelEditButton.addEventListener('click', () => {
 });
 
 renderManageList();
+renderCategories();
+
+addCategoryButton.addEventListener('click', async () => {
+  const name = categoryName.value.trim();
+  const icon = categoryIcon.value.trim() || '📑';
+  if (!name) {
+    showStatus(categoryStatusBox, 'Введите название категории.', 'error');
+    return;
+  }
+  if (cachedCategories.some((category) => normalizeText(category.name) === normalizeText(name))) {
+    showStatus(categoryStatusBox, 'Такая категория уже существует.', 'error');
+    return;
+  }
+
+  addCategoryButton.disabled = true;
+  try {
+    const token = requireToken();
+    const loaded = await loadRepositoryData(token);
+    cachedDocuments = loaded.documents;
+    cachedChangelog = loaded.changelog;
+    cachedCategories = loaded.categories;
+    if (cachedCategories.some((category) => normalizeText(category.name) === normalizeText(name))) {
+      throw new Error('Такая категория уже существует.');
+    }
+    const categories = [...cachedCategories, { name, icon }]
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    await createAtomicCommit([
+      jsonChange(CONFIG.categoriesPath, categories)
+    ], `Добавлена категория: ${name}`, token);
+    cachedCategories = categories;
+    renderCategories();
+    categoryName.value = '';
+    categoryIcon.value = '';
+    showStatus(categoryStatusBox, 'Категория добавлена.', 'success');
+  } catch (error) {
+    showStatus(categoryStatusBox, `Ошибка: ${error.message}`, 'error');
+  } finally {
+    addCategoryButton.disabled = false;
+  }
+});
+
+categoryList.addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-category]');
+  if (!button) return;
+  const name = button.dataset.category;
+  if (cachedDocuments.some((documentItem) => documentItem.category === name)) {
+    showStatus(categoryStatusBox, 'Нельзя удалить категорию, пока она используется документами.', 'error');
+    return;
+  }
+  if (!confirm(`Удалить категорию «${name}»?`)) return;
+
+  button.disabled = true;
+  try {
+    const token = requireToken();
+    const loaded = await loadRepositoryData(token);
+    cachedDocuments = loaded.documents;
+    cachedChangelog = loaded.changelog;
+    cachedCategories = loaded.categories;
+    if (cachedDocuments.some((documentItem) => documentItem.category === name)) {
+      throw new Error('Категория уже используется документом.');
+    }
+    const categories = cachedCategories.filter((category) => category.name !== name);
+    await createAtomicCommit([
+      jsonChange(CONFIG.categoriesPath, categories)
+    ], `Удалена категория: ${name}`, token);
+    cachedCategories = categories;
+    renderCategories();
+    showStatus(categoryStatusBox, 'Категория удалена.', 'success');
+  } catch (error) {
+    showStatus(categoryStatusBox, `Ошибка: ${error.message}`, 'error');
+  } finally {
+    button.disabled = false;
+  }
+});

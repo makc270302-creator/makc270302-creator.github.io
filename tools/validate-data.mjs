@@ -29,14 +29,31 @@ async function readJson(fileName) {
 
 const documents = await readJson('documents.json');
 const changelog = await readJson('changelog.json');
+const categories = await readJson('categories.json');
 await readJson('documents.schema.json');
 await readJson('changelog.schema.json');
+await readJson('categories.schema.json');
 const requiredDocumentFields = [
   'title', 'description', 'category', 'author', 'uploadDate',
-  'updatedDate', 'version', 'popular', 'icon', 'path'
+  'updatedDate', 'version', 'popular', 'archived', 'icon', 'path'
 ];
 const titles = new Set();
 const paths = new Set();
+const categoryNames = new Set();
+
+if (!Array.isArray(categories)) errors.push('categories.json должен содержать массив.');
+for (const [index, category] of categories.entries()) {
+  const label = `categories.json[${index}]`;
+  if (!category || typeof category !== 'object' || Array.isArray(category)) {
+    errors.push(`${label}: требуется объект.`);
+    continue;
+  }
+  if (typeof category.name !== 'string' || !category.name.trim()) errors.push(`${label}.name: требуется непустая строка.`);
+  if (typeof category.icon !== 'string' || !category.icon.trim()) errors.push(`${label}.icon: требуется непустая строка.`);
+  const normalizedName = String(category.name || '').toLocaleLowerCase('ru-RU').trim();
+  if (categoryNames.has(normalizedName)) errors.push(`${label}: дублирующаяся категория.`);
+  categoryNames.add(normalizedName);
+}
 
 if (!Array.isArray(documents)) errors.push('documents.json должен содержать массив.');
 
@@ -55,6 +72,10 @@ for (const [index, documentItem] of documents.entries()) {
     }
   }
   if (typeof documentItem.popular !== 'boolean') errors.push(`${label}.popular: требуется boolean.`);
+  if (typeof documentItem.archived !== 'boolean') errors.push(`${label}.archived: требуется boolean.`);
+  if (!categoryNames.has(String(documentItem.category || '').toLocaleLowerCase('ru-RU').trim())) {
+    errors.push(`${label}.category: категория отсутствует в categories.json.`);
+  }
   if (!validDate(documentItem.uploadDate) || !validDate(documentItem.updatedDate)) {
     errors.push(`${label}: некорректная дата.`);
   }
@@ -97,4 +118,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Проверено документов: ${documents.length}; записей истории: ${changelog.length}.`);
+console.log(`Проверено документов: ${documents.length}; категорий: ${categories.length}; записей истории: ${changelog.length}.`);

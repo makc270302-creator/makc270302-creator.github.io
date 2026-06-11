@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "categories.schema.json",
+  "title": "Категории портала",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "icon"],
+    "properties": {
+      "name": { "type": "string", "minLength": 1 },
+      "icon": { "type": "string", "minLength": 1, "maxLength": 8 }
+    }
+  }
+}

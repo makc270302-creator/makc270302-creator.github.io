@@ -41,23 +41,7 @@
 
       <label for="docCategory">Категория</label>
       <input id="docCategory" type="text" list="categorySuggestions" placeholder="Например: 1С" />
-      <datalist id="categorySuggestions">
-        <option value="1С"></option>
-        <option value="Склад"></option>
-        <option value="Комплектация"></option>
-        <option value="Потери"></option>
-        <option value="Охрана труда"></option>
-        <option value="Пожарная безопасность"></option>
-        <option value="Зарядная станция"></option>
-        <option value="Проверка и формирование"></option>
-        <option value="ФРОВ"></option>
-        <option value="Техника"></option>
-        <option value="Грузчик"></option>
-        <option value="Оператор 1С"></option>
-        <option value="Оператор поломоечной машины"></option>
-        <option value="Оператор упаковочного аппарата"></option>
-        <option value="Водитель подъёмно-транспортной складской техники"></option>
-      </datalist>
+      <datalist id="categorySuggestions"></datalist>
 
       <label for="docAuthor">Автор</label>
       <input id="docAuthor" type="text" value="Менеджер по стандартизации Ромашов М.С." />
@@ -75,6 +59,22 @@
 
       <button id="uploadButton" type="button">Загрузить документ</button>
       <div id="statusBox" class="status-box" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="section-block admin-card">
+      <div class="admin-section-title">
+        <div>
+          <h2>Категории</h2>
+          <p>Категории используются в фильтре и карточках документов.</p>
+        </div>
+      </div>
+      <div class="category-form">
+        <input id="categoryName" type="text" placeholder="Название категории" aria-label="Название новой категории" />
+        <input id="categoryIcon" type="text" placeholder="Иконка" aria-label="Иконка новой категории" maxlength="8" />
+        <button id="addCategoryButton" type="button">Добавить</button>
+      </div>
+      <div id="categoryList" class="manage-list"></div>
+      <div id="categoryStatusBox" class="status-box" role="status" aria-live="polite" hidden></div>
     </section>
 
     <section id="managePanel" class="section-block admin-card">
@@ -118,6 +118,7 @@
       <input id="editVersion" type="text" />
 
       <label class="checkbox-row"><input id="editPopular" type="checkbox" /> Часто используемый документ</label>
+      <label class="checkbox-row"><input id="editArchived" type="checkbox" /> Архивный документ</label>
 
       <label for="editPdfFile">Заменить PDF (необязательно)</label>
       <input id="editPdfFile" type="file" accept="application/pdf,.pdf" />

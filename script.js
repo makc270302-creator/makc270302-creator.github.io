@@ -3,36 +3,22 @@ import {
   getDocumentPath,
   normalizeText,
   parseDate,
+  sortByDateDescending,
   sortDocuments
 } from './common.js';
 
 let files = [];
 let changelog = [];
-
-const CATEGORY_ICONS = {
-  '1С': '🖥️',
-  'Склад': '🏠',
-  'Комплектация': '📦',
-  'Потери': '📉',
-  'Охрана труда': '🦺',
-  'Пожарная безопасность': '🔥',
-  'Зарядная станция': '⚡',
-  'Проверка и формирование': '📋',
-  'ФРОВ': '🍊',
-  'Техника': '⚙️',
-  'Грузчик': '👷',
-  'Оператор 1С': '💻',
-  'Оператор поломоечной машины': '🧼',
-  'Оператор упаковочного аппарата': '🔄',
-  'Водитель подъёмно-транспортной складской техники': '🏗️🚜',
-
-};
+let categoryIcons = {};
 
 const fileList = document.getElementById('fileList');
 const popularList = document.getElementById('popularList');
 const popularSection = document.getElementById('popularSection');
 const searchInput = document.getElementById('searchInput');
 const categoryFilter = document.getElementById('categoryFilter');
+const sortFilter = document.getElementById('sortFilter');
+const showArchived = document.getElementById('showArchived');
+const documentsSummary = document.getElementById('documentsSummary');
 const filesCount = document.getElementById('filesCount');
 const categoriesCount = document.getElementById('categoriesCount');
 const latestUpdate = document.getElementById('latestUpdate');
@@ -49,7 +35,7 @@ const viewerStatus = document.getElementById('viewerStatus');
 let viewerLoadTimer = null;
 
 function getCategoryIcon(category) {
-  return CATEGORY_ICONS[category] || '📑';
+  return categoryIcons[category] || '📑';
 }
 
 function sortFiles() {
@@ -57,7 +43,7 @@ function sortFiles() {
 }
 
 function setupCategories() {
-  const uniqueCategories = [...new Set(files.map((file) => file.category))]
+  const uniqueCategories = [...new Set([...Object.keys(categoryIcons), ...files.map((file) => file.category)])]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
 
@@ -77,7 +63,7 @@ function getFilteredFiles() {
   const search = normalizeText(searchInput.value);
   const category = categoryFilter.value;
 
-  return files.filter((file) => {
+  const filtered = files.filter((file) => {
     const matchesSearch =
       normalizeText(file.title).includes(search) ||
       normalizeText(file.description).includes(search) ||
@@ -88,7 +74,16 @@ function getFilteredFiles() {
 
     const matchesCategory = category === 'Все категории' || file.category === category;
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && (showArchived.checked || !file.archived);
+  });
+
+  return filtered.sort((a, b) => {
+    if (sortFilter.value === 'title-desc') return String(b.title).localeCompare(String(a.title), 'ru');
+    if (sortFilter.value === 'date-desc') return sortByDateDescending(a, b);
+    if (sortFilter.value === 'date-asc') return sortByDateDescending(b, a);
+    if (sortFilter.value === 'popular') return Number(Boolean(b.popular)) - Number(Boolean(a.popular))
+      || String(a.title).localeCompare(String(b.title), 'ru');
+    return String(a.title).localeCompare(String(b.title), 'ru');
   });
 }
 
@@ -120,6 +115,7 @@ function createCard(file) {
   cardTop.className = 'card-top';
   appendTextElement(cardTop, 'div', getCategoryIcon(file.category), 'file-icon');
   appendTextElement(cardTop, 'span', file.category || 'Без категории', 'tag');
+  if (file.archived) appendTextElement(cardTop, 'span', 'Архив', 'tag tag--archive');
   card.appendChild(cardTop);
   appendTextElement(card, 'h2', file.title || 'Без названия');
   appendTextElement(card, 'p', file.description || '');
@@ -161,16 +157,20 @@ function createPopularCard(file) {
 
 function renderFiles() {
   const filteredFiles = getFilteredFiles();
+  const availableFiles = showArchived.checked ? files : files.filter((file) => !file.archived);
 
   fileList.replaceChildren();
-  filesCount.textContent = `${filteredFiles.length} / ${files.length}`;
+  filesCount.textContent = `${filteredFiles.length} / ${availableFiles.length}`;
+  documentsSummary.textContent = showArchived.checked
+    ? 'Показаны активные и архивные документы.'
+    : 'Архивные документы скрыты.';
   emptyState.hidden = filteredFiles.length > 0;
 
   filteredFiles.forEach((file) => fileList.appendChild(createCard(file)));
 }
 
 function renderPopular() {
-  const popularFiles = files.filter((file) => file.popular).slice(0, 6);
+  const popularFiles = files.filter((file) => file.popular && !file.archived).slice(0, 6);
   popularList.replaceChildren();
   popularSection.hidden = popularFiles.length === 0;
   popularFiles.forEach((file) => popularList.appendChild(createPopularCard(file)));
@@ -193,6 +193,7 @@ function renderChangelog() {
 
 function updateDashboard() {
   const latest = files
+    .filter((file) => !file.archived)
     .map((file) => {
       const value = file.updatedDate || file.uploadDate;
       return { value, date: parseDate(value) };
@@ -242,15 +243,18 @@ closeViewer.addEventListener('click', () => {
 
 async function loadDocuments() {
   try {
-    const [documentsResponse, changelogResponse] = await Promise.all([
+    const [documentsResponse, changelogResponse, categoriesResponse] = await Promise.all([
       fetch('documents.json', { cache: 'no-cache' }),
-      fetch('changelog.json', { cache: 'no-cache' })
+      fetch('changelog.json', { cache: 'no-cache' }),
+      fetch('categories.json', { cache: 'no-cache' })
     ]);
 
     if (!documentsResponse.ok) throw new Error('Не удалось загрузить documents.json');
 
     files = await documentsResponse.json();
     changelog = changelogResponse.ok ? await changelogResponse.json() : [];
+    const categories = categoriesResponse.ok ? await categoriesResponse.json() : [];
+    categoryIcons = Object.fromEntries(categories.map((category) => [category.name, category.icon]));
 
     sortFiles();
     setupCategories();
@@ -271,6 +275,8 @@ async function loadDocuments() {
 
 searchInput.addEventListener('input', renderFiles);
 categoryFilter.addEventListener('change', renderFiles);
+sortFilter.addEventListener('change', renderFiles);
+showArchived.addEventListener('change', renderFiles);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });

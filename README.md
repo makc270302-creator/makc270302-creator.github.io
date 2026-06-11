@@ -11,10 +11,12 @@
 - админ-страница `admin.html` для управления PDF через GitHub API;
 - атомарное сохранение PDF, карточки и истории одним Git-коммитом;
 - автоматическая проверка JavaScript, JSON и наличия PDF через GitHub Actions.
+- управляемые категории из `categories.json`;
+- архив документов и расширенная сортировка.
 
 Важно:
 - GitHub token не храните в файлах сайта.
 - Используйте fine-grained token только для этого репозитория с правом `Contents: Read and write`.
 - Админ-страница доступна всем, но операции изменения выполняются только с действующим GitHub token.
-- Формат данных описан в `documents.schema.json` и `changelog.schema.json`.
+- Формат данных описан в `documents.schema.json`, `categories.schema.json` и `changelog.schema.json`.
 - Полная локальная проверка при наличии Node.js: `npm test`.

@@ -13,7 +13,7 @@
     <div class="hero__content">
       <div>
         <p class="eyebrow">Внутренняя база документов ООО "Разгуляй"</p>
-        <h1>PDF-инструкции v 2.0.0</h1>
+        <h1>PDF-инструкции v 2.1.0</h1>
         <p class="hero__text">Корпоративная база знаний: поиск, категории, версии документов, история изменений и просмотр PDF прямо на сайте.</p>
       </div>
       <div class="hero__actions">
@@ -30,7 +30,7 @@
       <div class="dashboard-card"><strong id="latestUpdate">—</strong><span>последнее обновление</span></div>
     </section>
 
-    <section class="toolbar">
+    <section class="toolbar toolbar--extended">
       <div class="search-box">
         <span>🔎</span>
         <input id="searchInput" type="search" aria-label="Поиск документов" placeholder="Поиск по названию, описанию, автору или категории..." />
@@ -38,6 +38,14 @@
       <select id="categoryFilter" aria-label="Фильтр по категории">
         <option value="Все категории">Все категории</option>
       </select>
+      <select id="sortFilter" aria-label="Сортировка документов">
+        <option value="title-asc">По названию А–Я</option>
+        <option value="title-desc">По названию Я–А</option>
+        <option value="date-desc">Сначала новые</option>
+        <option value="date-asc">Сначала старые</option>
+        <option value="popular">Сначала популярные</option>
+      </select>
+      <label class="archive-toggle"><input id="showArchived" type="checkbox" /> Показать архив</label>
     </section>
 
     <section class="layout">
@@ -53,7 +61,7 @@
         <section class="section-block">
           <div class="section-title">
             <h2>📚 Все документы</h2>
-            <p>Карточки отсортированы по алфавиту.</p>
+            <p id="documentsSummary">Активные документы.</p>
           </div>
           <section id="fileList" class="file-grid"></section>
           <section id="emptyState" class="empty-state" hidden>

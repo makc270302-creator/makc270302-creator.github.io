@@ -9,7 +9,8 @@
     "version": "1.1",
     "popular": false,
     "icon": "",
-    "path": "files/Аудитные листы.pdf"
+    "path": "files/Аудитные листы.pdf",
+    "archived": false
   },
   {
     "title": "Аудитный лист",
@@ -21,7 +22,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Аудитный лист.pdf"
+    "path": "files/Аудитный лист.pdf",
+    "archived": false
   },
   {
     "title": "Бой",
@@ -33,7 +35,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Бой.pdf"
+    "path": "files/Бой.pdf",
+    "archived": false
   },
   {
     "title": "Возвраты поставщикам",
@@ -45,7 +48,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Возвраты поставщикам.pdf"
+    "path": "files/Возвраты поставщикам.pdf",
+    "archived": false
   },
   {
     "title": "Инструкции ФРОВ",
@@ -57,7 +61,8 @@
     "version": "1.0",
     "popular": true,
     "icon": "",
-    "path": "files/Инструкции ФРОВ.pdf"
+    "path": "files/Инструкции ФРОВ.pdf",
+    "archived": false
   },
   {
     "title": "Инструкция по комплектации",
@@ -69,7 +74,8 @@
     "updatedDate": "11.06.2026",
     "version": "1.1",
     "popular": true,
-    "icon": ""
+    "icon": "",
+    "archived": false
   },
   {
     "title": "Оператор 1С",
@@ -81,7 +87,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Оператор 1С.pdf"
+    "path": "files/Оператор 1С.pdf",
+    "archived": false
   },
   {
     "title": "Операции по приходным накладным",
@@ -93,7 +100,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Операции по приходным накладным.pdf"
+    "path": "files/Операции по приходным накладным.pdf",
+    "archived": false
   },
   {
     "title": "Печать штрихкодов сотрудников",
@@ -105,7 +113,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Печать штрихкодов сотрудников.pdf"
+    "path": "files/Печать штрихкодов сотрудников.pdf",
+    "archived": false
   },
   {
     "title": "Поломоечная машина KARCHER (Кёрхер)",
@@ -117,7 +126,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Поломоечная машина KARCHER (Кёрхер).pdf"
+    "path": "files/Поломоечная машина KARCHER (Кёрхер).pdf",
+    "archived": false
   },
   {
     "title": "Поломоечная машина TVX T150",
@@ -129,7 +139,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Поломоечная машина TVX T150.pdf"
+    "path": "files/Поломоечная машина TVX T150.pdf",
+    "archived": false
   },
   {
     "title": "Приходные накладные",
@@ -141,7 +152,8 @@
     "updatedDate": "09.06.2026",
     "version": "1.0",
     "popular": false,
-    "icon": ""
+    "icon": "",
+    "archived": false
   },
   {
     "title": "Проверка и формирование",
@@ -153,7 +165,8 @@
     "version": "1.0",
     "popular": true,
     "icon": "",
-    "path": "files/Проверка и формирование.pdf"
+    "path": "files/Проверка и формирование.pdf",
+    "archived": false
   },
   {
     "title": "Рабочая инструкция ОУА",
@@ -165,7 +178,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Рабочая инструкция ОУА.pdf"
+    "path": "files/Рабочая инструкция ОУА.pdf",
+    "archived": false
   },
   {
     "title": "Развоз",
@@ -177,7 +191,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Развоз.pdf"
+    "path": "files/Развоз.pdf",
+    "archived": false
   },
   {
     "title": "Расходная накладная",
@@ -189,7 +204,8 @@
     "updatedDate": "09.06.2026",
     "version": "1.0",
     "popular": false,
-    "icon": ""
+    "icon": "",
+    "archived": false
   },
   {
     "title": "Расходные накладные",
@@ -201,7 +217,8 @@
     "updatedDate": "09.06.2026",
     "version": "1.0",
     "popular": false,
-    "icon": ""
+    "icon": "",
+    "archived": false
   },
   {
     "title": "Реестр расходных накладных",
@@ -213,7 +230,8 @@
     "updatedDate": "09.06.2026",
     "version": "1.0",
     "popular": false,
-    "icon": ""
+    "icon": "",
+    "archived": false
   },
   {
     "title": "Самоходная тележка NOBLELIFT",
@@ -225,7 +243,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Самоходная тележка NOBLELIFT.pdf"
+    "path": "files/Самоходная тележка NOBLELIFT.pdf",
+    "archived": false
   },
   {
     "title": "Списание",
@@ -237,7 +256,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Списание.pdf"
+    "path": "files/Списание.pdf",
+    "archived": false
   },
   {
     "title": "Списания",
@@ -249,7 +269,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Списания.pdf"
+    "path": "files/Списания.pdf",
+    "archived": false
   },
   {
     "title": "Статистика по доставке",
@@ -261,7 +282,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Статистика по доставке.pdf"
+    "path": "files/Статистика по доставке.pdf",
+    "archived": false
   },
   {
     "title": "Статистика по сборке",
@@ -273,7 +295,8 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Статистика по сборке.pdf"
+    "path": "files/Статистика по сборке.pdf",
+    "archived": false
   },
   {
     "title": "Электрическая тележка",
@@ -285,6 +308,7 @@
     "version": "1.0",
     "popular": false,
     "icon": "",
-    "path": "files/Электрическая тележка.pdf"
+    "path": "files/Электрическая тележка.pdf",
+    "archived": false
   }
 ]
