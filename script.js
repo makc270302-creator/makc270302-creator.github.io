@@ -10,6 +10,10 @@ import {
 let files = [];
 let changelog = [];
 let categoryIcons = {};
+const FAVORITES_KEY = 'pdf-portal-favorites';
+const VIEW_KEY = 'pdf-portal-view';
+let favorites = new Set(readStoredArray(FAVORITES_KEY));
+let viewMode = readStoredValue(VIEW_KEY) === 'compact' ? 'compact' : 'cards';
 
 const fileList = document.getElementById('fileList');
 const popularList = document.getElementById('popularList');
@@ -19,6 +23,9 @@ const categoryFilter = document.getElementById('categoryFilter');
 const sortFilter = document.getElementById('sortFilter');
 const showArchived = document.getElementById('showArchived');
 const documentsSummary = document.getElementById('documentsSummary');
+const showFavorites = document.getElementById('showFavorites');
+const cardViewButton = document.getElementById('cardViewButton');
+const compactViewButton = document.getElementById('compactViewButton');
 const filesCount = document.getElementById('filesCount');
 const categoriesCount = document.getElementById('categoriesCount');
 const latestUpdate = document.getElementById('latestUpdate');
@@ -30,9 +37,84 @@ const viewerHint = document.getElementById('viewerHint');
 const viewerActions = document.getElementById('viewerActions');
 const viewerOpen = document.getElementById('viewerOpen');
 const viewerDownload = document.getElementById('viewerDownload');
+const viewerCopyLink = document.getElementById('viewerCopyLink');
 const closeViewer = document.getElementById('closeViewer');
 const viewerStatus = document.getElementById('viewerStatus');
 let viewerLoadTimer = null;
+let currentViewerFile = null;
+
+function readStoredArray(key) {
+  try {
+    const value = JSON.parse(readStoredValue(key) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredValue(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storeValue(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Настройки останутся активны до перезагрузки страницы.
+  }
+}
+
+function isNewDocument(file) {
+  const date = parseDate(file.updatedDate || file.uploadDate);
+  if (!date) return false;
+  const age = Date.now() - date.getTime();
+  return age >= 0 && age <= 14 * 24 * 60 * 60 * 1000;
+}
+
+function getShareUrl(file) {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('document', getDocumentPath(file));
+  return url.toString();
+}
+
+async function copyDocumentLink(file, button = null) {
+  const link = getShareUrl(file);
+  try {
+    await navigator.clipboard.writeText(link);
+  } catch {
+    window.prompt('Скопируйте ссылку на документ:', link);
+  }
+  if (button) {
+    const originalText = button.textContent;
+    button.textContent = 'Скопировано';
+    setTimeout(() => {
+      button.textContent = originalText;
+    }, 1500);
+  }
+}
+
+function toggleFavorite(file) {
+  const path = getDocumentPath(file);
+  if (!path) return;
+  if (favorites.has(path)) favorites.delete(path);
+  else favorites.add(path);
+  storeValue(FAVORITES_KEY, JSON.stringify([...favorites]));
+  renderFiles();
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  storeValue(VIEW_KEY, mode);
+  fileList.classList.toggle('file-grid--compact', mode === 'compact');
+  cardViewButton.setAttribute('aria-pressed', String(mode === 'cards'));
+  compactViewButton.setAttribute('aria-pressed', String(mode === 'compact'));
+}
 
 function getCategoryIcon(category) {
   return categoryIcons[category] || '📑';
@@ -74,7 +156,8 @@ function getFilteredFiles() {
 
     const matchesCategory = category === 'Все категории' || file.category === category;
 
-    return matchesSearch && matchesCategory && (showArchived.checked || !file.archived);
+    const matchesFavorite = !showFavorites.checked || favorites.has(getDocumentPath(file));
+    return matchesSearch && matchesCategory && matchesFavorite && (showArchived.checked || !file.archived);
   });
 
   return filtered.sort((a, b) => {
@@ -115,14 +198,20 @@ function createCard(file) {
   cardTop.className = 'card-top';
   appendTextElement(cardTop, 'div', getCategoryIcon(file.category), 'file-icon');
   appendTextElement(cardTop, 'span', file.category || 'Без категории', 'tag');
+  if (isNewDocument(file)) appendTextElement(cardTop, 'span', 'Новое', 'tag tag--new');
   if (file.archived) appendTextElement(cardTop, 'span', 'Архив', 'tag tag--archive');
+  const favoriteButton = appendTextElement(cardTop, 'button', favorites.has(path) ? '★' : '☆', 'favorite-button');
+  favoriteButton.type = 'button';
+  favoriteButton.title = favorites.has(path) ? 'Убрать из избранного' : 'Добавить в избранное';
+  favoriteButton.setAttribute('aria-label', favoriteButton.title);
+  favoriteButton.addEventListener('click', () => toggleFavorite(file));
   card.appendChild(cardTop);
   appendTextElement(card, 'h2', file.title || 'Без названия');
   appendTextElement(card, 'p', file.description || '');
   card.appendChild(createMeta(file));
 
   const actions = document.createElement('div');
-  actions.className = 'actions actions--three';
+  actions.className = 'actions actions--four';
   const previewButton = appendTextElement(actions, 'button', 'Просмотр', 'preview-link');
   previewButton.type = 'button';
   previewButton.disabled = !encodedPath;
@@ -136,6 +225,10 @@ function createCard(file) {
     const downloadLink = appendTextElement(actions, 'a', 'Скачать', 'download-link');
     downloadLink.href = encodedPath;
     downloadLink.download = '';
+
+    const copyButton = appendTextElement(actions, 'button', 'Ссылка', 'copy-link');
+    copyButton.type = 'button';
+    copyButton.addEventListener('click', () => copyDocumentLink(file, copyButton));
   }
 
   previewButton.addEventListener('click', () => openViewer(file));
@@ -163,7 +256,7 @@ function renderFiles() {
   filesCount.textContent = `${filteredFiles.length} / ${availableFiles.length}`;
   documentsSummary.textContent = showArchived.checked
     ? 'Показаны активные и архивные документы.'
-    : 'Архивные документы скрыты.';
+    : showFavorites.checked ? 'Показаны только избранные документы.' : 'Архивные документы скрыты.';
   emptyState.hidden = filteredFiles.length > 0;
 
   filteredFiles.forEach((file) => fileList.appendChild(createCard(file)));
@@ -208,6 +301,7 @@ function openViewer(file) {
   const path = getDocumentPath(file);
   if (!path) return;
   const encodedPath = encodeURI(path);
+  currentViewerFile = file;
   viewerTitle.textContent = file.title;
   viewerHint.hidden = true;
   viewerStatus.hidden = false;
@@ -218,6 +312,9 @@ function openViewer(file) {
   viewerOpen.href = encodedPath;
   viewerDownload.href = encodedPath;
   viewerDownload.setAttribute('download', `${file.title}.pdf`);
+  const url = new URL(window.location.href);
+  url.searchParams.set('document', path);
+  history.replaceState(null, '', url);
   clearTimeout(viewerLoadTimer);
   viewerLoadTimer = setTimeout(() => {
     viewerStatus.hidden = false;
@@ -239,6 +336,10 @@ closeViewer.addEventListener('click', () => {
   viewerHint.hidden = false;
   viewerStatus.hidden = true;
   viewerTitle.textContent = 'Выберите документ';
+  currentViewerFile = null;
+  const url = new URL(window.location.href);
+  url.searchParams.delete('document');
+  history.replaceState(null, '', url);
 });
 
 async function loadDocuments() {
@@ -262,6 +363,10 @@ async function loadDocuments() {
     renderPopular();
     renderFiles();
     renderChangelog();
+    setViewMode(viewMode);
+    const requestedPath = new URLSearchParams(window.location.search).get('document');
+    const requestedFile = files.find((file) => getDocumentPath(file) === requestedPath);
+    if (requestedFile) openViewer(requestedFile);
   } catch (error) {
     fileList.replaceChildren();
     const errorState = document.createElement('div');
@@ -277,6 +382,12 @@ searchInput.addEventListener('input', renderFiles);
 categoryFilter.addEventListener('change', renderFiles);
 sortFilter.addEventListener('change', renderFiles);
 showArchived.addEventListener('change', renderFiles);
+showFavorites.addEventListener('change', renderFiles);
+cardViewButton.addEventListener('click', () => setViewMode('cards'));
+compactViewButton.addEventListener('click', () => setViewMode('compact'));
+viewerCopyLink.addEventListener('click', () => {
+  if (currentViewerFile) copyDocumentLink(currentViewerFile, viewerCopyLink);
+});
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });
