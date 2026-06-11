@@ -11,7 +11,7 @@ const CATEGORY_ICONS = {
   'Зарядная станция': '⚡',
   'Проверка и формирование': '📋',
   'ФРОВ': '🍊',
-  'Техника': '⚙️',
+  'Техника': '⚙️'
 };
 
 const fileList = document.getElementById('fileList');
