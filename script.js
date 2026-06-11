@@ -42,6 +42,39 @@ function normalizeText(value) {
   return String(value || '').toLowerCase().trim();
 }
 
+function appendTextElement(parent, tagName, text, className = '') {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+  return element;
+}
+
+function parseDate(value) {
+  const text = String(value || '').trim();
+  const ruMatch = text.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parts = ruMatch
+    ? [Number(ruMatch[3]), Number(ruMatch[2]), Number(ruMatch[1])]
+    : isoMatch
+      ? [Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3])]
+      : null;
+
+  if (!parts) return null;
+
+  const [year, month, day] = parts;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+    ? date
+    : null;
+}
+
+function getDocumentPath(file) {
+  const path = String(file.path || '').trim().replace(/\\/g, '/');
+  if (!/^files\/[^?#]+\.pdf$/i.test(path) || path.split('/').includes('..')) return null;
+  return encodeURI(path);
+}
+
 function getCategoryIcon(category) {
   return CATEGORY_ICONS[category] || '📑';
 }
@@ -55,7 +88,7 @@ function setupCategories() {
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
 
-  categoryFilter.innerHTML = '';
+  categoryFilter.replaceChildren();
 
   ['Все категории', ...uniqueCategories].forEach((category) => {
     const option = document.createElement('option');
@@ -87,37 +120,56 @@ function getFilteredFiles() {
 }
 
 function createMeta(file) {
-  return `
-    <div class="meta">
-      <div><span>👤 Автор:</span> ${file.author || 'Не указан'}</div>
-      <div><span>📅 Загружен:</span> ${file.uploadDate || '—'}</div>
-      <div><span>🔄 Обновлён:</span> ${file.updatedDate || file.uploadDate || '—'}</div>
-      <div><span>🏷️ Версия:</span> ${file.version || '1.0'}</div>
-    </div>
-  `;
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+
+  [
+    ['👤 Автор:', file.author || 'Не указан'],
+    ['📅 Загружен:', file.uploadDate || '—'],
+    ['🔄 Обновлён:', file.updatedDate || file.uploadDate || '—'],
+    ['🏷️ Версия:', file.version || '1.0']
+  ].forEach(([label, value]) => {
+    const row = document.createElement('div');
+    appendTextElement(row, 'span', label);
+    row.append(document.createTextNode(` ${value}`));
+    meta.appendChild(row);
+  });
+
+  return meta;
 }
 
 function createCard(file) {
   const card = document.createElement('article');
   card.className = 'file-card';
-  const encodedPath = encodeURI(file.path);
+  const encodedPath = getDocumentPath(file);
+  const cardTop = document.createElement('div');
+  cardTop.className = 'card-top';
+  appendTextElement(cardTop, 'div', getCategoryIcon(file.category), 'file-icon');
+  appendTextElement(cardTop, 'span', file.category || 'Без категории', 'tag');
+  card.appendChild(cardTop);
+  appendTextElement(card, 'h2', file.title || 'Без названия');
+  appendTextElement(card, 'p', file.description || '');
+  card.appendChild(createMeta(file));
 
-  card.innerHTML = `
-    <div class="card-top">
-      <div class="file-icon">${getCategoryIcon(file.category)}</div>
-      <span class="tag">${file.category}</span>
-    </div>
-    <h2>${file.title}</h2>
-    <p>${file.description}</p>
-    ${createMeta(file)}
-    <div class="actions actions--three">
-      <button class="preview-link" type="button">Просмотр</button>
-      <a class="open-link" href="${encodedPath}" target="_blank" rel="noopener">Открыть</a>
-      <a class="download-link" href="${encodedPath}" download>Скачать</a>
-    </div>
-  `;
+  const actions = document.createElement('div');
+  actions.className = 'actions actions--three';
+  const previewButton = appendTextElement(actions, 'button', 'Просмотр', 'preview-link');
+  previewButton.type = 'button';
+  previewButton.disabled = !encodedPath;
 
-  card.querySelector('.preview-link').addEventListener('click', () => openViewer(file));
+  if (encodedPath) {
+    const openLink = appendTextElement(actions, 'a', 'Открыть', 'open-link');
+    openLink.href = encodedPath;
+    openLink.target = '_blank';
+    openLink.rel = 'noopener';
+
+    const downloadLink = appendTextElement(actions, 'a', 'Скачать', 'download-link');
+    downloadLink.href = encodedPath;
+    downloadLink.download = '';
+  }
+
+  previewButton.addEventListener('click', () => openViewer(file));
+  card.appendChild(actions);
   return card;
 }
 
@@ -125,11 +177,10 @@ function createPopularCard(file) {
   const item = document.createElement('button');
   item.type = 'button';
   item.className = 'popular-card';
-  item.innerHTML = `
-    <span>${getCategoryIcon(file.category)}</span>
-    <strong>${file.title}</strong>
-    <small>${file.category} · v${file.version || '1.0'}</small>
-  `;
+  item.disabled = !getDocumentPath(file);
+  appendTextElement(item, 'span', getCategoryIcon(file.category));
+  appendTextElement(item, 'strong', file.title || 'Без названия');
+  appendTextElement(item, 'small', `${file.category || 'Без категории'} · v${file.version || '1.0'}`);
   item.addEventListener('click', () => openViewer(file));
   return item;
 }
@@ -137,7 +188,7 @@ function createPopularCard(file) {
 function renderFiles() {
   const filteredFiles = getFilteredFiles();
 
-  fileList.innerHTML = '';
+  fileList.replaceChildren();
   filesCount.textContent = `${filteredFiles.length} / ${files.length}`;
   emptyState.hidden = filteredFiles.length > 0;
 
@@ -146,35 +197,41 @@ function renderFiles() {
 
 function renderPopular() {
   const popularFiles = files.filter((file) => file.popular).slice(0, 6);
-  popularList.innerHTML = '';
+  popularList.replaceChildren();
   popularSection.hidden = popularFiles.length === 0;
   popularFiles.forEach((file) => popularList.appendChild(createPopularCard(file)));
 }
 
 function renderChangelog() {
-  changelogList.innerHTML = '';
+  changelogList.replaceChildren();
 
   changelog.forEach((item) => {
     const node = document.createElement('article');
     node.className = 'timeline-item';
-    node.innerHTML = `
-      <time>${item.date}</time>
-      <div>
-        <h3>${item.title}</h3>
-        <p>${item.description}</p>
-      </div>
-    `;
+    appendTextElement(node, 'time', item.date || '—');
+    const content = document.createElement('div');
+    appendTextElement(content, 'h3', item.title || 'Изменение');
+    appendTextElement(content, 'p', item.description || '');
+    node.appendChild(content);
     changelogList.appendChild(node);
   });
 }
 
 function updateDashboard() {
-  const dates = files.map((file) => file.updatedDate || file.uploadDate).filter(Boolean);
-  latestUpdate.textContent = dates.sort((a, b) => b.localeCompare(a, 'ru'))[0] || '—';
+  const latest = files
+    .map((file) => {
+      const value = file.updatedDate || file.uploadDate;
+      return { value, date: parseDate(value) };
+    })
+    .filter((item) => item.date)
+    .sort((a, b) => b.date - a.date)[0];
+
+  latestUpdate.textContent = latest?.value || '—';
 }
 
 function openViewer(file) {
-  const encodedPath = encodeURI(file.path);
+  const encodedPath = getDocumentPath(file);
+  if (!encodedPath) return;
   viewerTitle.textContent = file.title;
   viewerHint.hidden = true;
   pdfViewer.hidden = false;
@@ -213,7 +270,12 @@ async function loadDocuments() {
     renderFiles();
     renderChangelog();
   } catch (error) {
-    fileList.innerHTML = `<div class="empty-state"><h2>Ошибка загрузки списка</h2><p>${error.message}</p></div>`;
+    fileList.replaceChildren();
+    const errorState = document.createElement('div');
+    errorState.className = 'empty-state';
+    appendTextElement(errorState, 'h2', 'Ошибка загрузки списка');
+    appendTextElement(errorState, 'p', error.message);
+    fileList.appendChild(errorState);
     filesCount.textContent = '0 / 0';
   }
 }

@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="referrer" content="same-origin" />
   <title>Управление документами</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -19,28 +21,20 @@
   </header>
 
   <main class="container admin-page">
-    <section id="loginPanel" class="section-block admin-card">
-      <h2>🔐 Вход</h2>
-      <p>Введите пароль администратора.</p>
-      <label>Пароль</label>
-      <input id="adminPassword" type="password" placeholder="Пароль" />
-      <button id="loginButton" type="button">Войти</button>
-    </section>
-
-    <section id="uploadPanel" class="section-block admin-card" hidden>
+    <section id="uploadPanel" class="section-block admin-card">
       <h2>⬆️ Новый документ</h2>
       <p>GitHub token не сохраняется на сайте. Его нужно вводить вручную при загрузке, редактировании или удалении.</p>
 
-      <label>GitHub token</label>
-      <input id="githubToken" type="password" placeholder="github_pat_..." />
+      <label for="githubToken">GitHub token</label>
+      <input id="githubToken" type="password" placeholder="github_pat_..." autocomplete="off" />
 
-      <label>Название документа</label>
+      <label for="docTitle">Название документа</label>
       <input id="docTitle" type="text" placeholder="Например: Вычерк" />
 
-      <label>Описание</label>
+      <label for="docDescription">Описание</label>
       <textarea id="docDescription" rows="4" placeholder="Краткое описание инструкции"></textarea>
 
-      <label>Категория</label>
+      <label for="docCategory">Категория</label>
       <input id="docCategory" type="text" list="categorySuggestions" placeholder="Например: 1С" />
       <datalist id="categorySuggestions">
         <option value="1С"></option>
@@ -60,25 +54,25 @@
         <option value="Водитель подъёмно-транспортной складской техники"></option>
       </datalist>
 
-      <label>Автор</label>
+      <label for="docAuthor">Автор</label>
       <input id="docAuthor" type="text" value="Менеджер по стандартизации Ромашов М.С." />
 
-      <label>Дата загрузки</label>
-      <input id="docDate" type="text" />
+      <label for="docDate">Дата загрузки</label>
+      <input id="docDate" type="text" inputmode="numeric" placeholder="ДД.ММ.ГГГГ" />
 
-      <label>Версия документа</label>
+      <label for="docVersion">Версия документа</label>
       <input id="docVersion" type="text" value="1.0" />
 
       <label class="checkbox-row"><input id="docPopular" type="checkbox" /> Добавить в часто используемые</label>
 
-      <label>PDF-файл</label>
+      <label for="pdfFile">PDF-файл</label>
       <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
 
       <button id="uploadButton" type="button">Загрузить документ</button>
       <div id="statusBox" class="status-box" hidden></div>
     </section>
 
-    <section id="managePanel" class="section-block admin-card" hidden>
+    <section id="managePanel" class="section-block admin-card">
       <div class="admin-section-title">
         <div>
           <h2>🗂️ Редактирование и удаление</h2>
@@ -97,25 +91,25 @@
 
       <input id="editOriginalPath" type="hidden" />
 
-      <label>Название документа</label>
+      <label for="editTitle">Название документа</label>
       <input id="editTitle" type="text" />
 
-      <label>Описание</label>
+      <label for="editDescription">Описание</label>
       <textarea id="editDescription" rows="4"></textarea>
 
-      <label>Категория</label>
+      <label for="editCategory">Категория</label>
       <input id="editCategory" type="text" list="categorySuggestions" />
 
-      <label>Автор</label>
+      <label for="editAuthor">Автор</label>
       <input id="editAuthor" type="text" />
 
-      <label>Дата загрузки</label>
-      <input id="editUploadDate" type="text" />
+      <label for="editUploadDate">Дата загрузки</label>
+      <input id="editUploadDate" type="text" inputmode="numeric" placeholder="ДД.ММ.ГГГГ" />
 
-      <label>Дата обновления</label>
-      <input id="editUpdatedDate" type="text" />
+      <label for="editUpdatedDate">Дата обновления</label>
+      <input id="editUpdatedDate" type="text" inputmode="numeric" placeholder="ДД.ММ.ГГГГ" />
 
-      <label>Версия документа</label>
+      <label for="editVersion">Версия документа</label>
       <input id="editVersion" type="text" />
 
       <label class="checkbox-row"><input id="editPopular" type="checkbox" /> Часто используемый документ</label>

@@ -7,16 +7,10 @@ const CONFIG = {
   filesFolder: 'files'
 };
 
-// Простая блокировка интерфейса. Настоящую защиту даёт GitHub token.
-const ADMIN_PASSWORD = '147963';
-
-const loginPanel = document.getElementById('loginPanel');
 const uploadPanel = document.getElementById('uploadPanel');
 const managePanel = document.getElementById('managePanel');
 const editPanel = document.getElementById('editPanel');
 
-const adminPassword = document.getElementById('adminPassword');
-const loginButton = document.getElementById('loginButton');
 const githubToken = document.getElementById('githubToken');
 
 const docTitle = document.getElementById('docTitle');
@@ -50,7 +44,6 @@ let cachedDocuments = [];
 let cachedDocumentsSha = null;
 let cachedChangelog = [];
 let cachedChangelogSha = null;
-let isAdminAuthenticated = false;
 
 function todayRu() {
   return new Date().toLocaleDateString('ru-RU');
@@ -61,38 +54,15 @@ docDate.value = todayRu();
 function showStatus(element, message, type = 'info') {
   element.hidden = false;
   element.className = `status-box status-box--${type}`;
-  element.innerHTML = message;
+  element.textContent = message;
 }
 
 function hideStatus(element) {
   element.hidden = true;
-  element.innerHTML = '';
-}
-
-function requireAdmin() {
-  if (!isAdminAuthenticated) {
-    throw new Error('Сначала введите пароль администратора.');
-  }
-}
-
-function lockAdminPanels() {
-  isAdminAuthenticated = false;
-  loginPanel.hidden = false;
-  uploadPanel.hidden = true;
-  managePanel.hidden = true;
-  editPanel.hidden = true;
-}
-
-function unlockAdminPanels() {
-  isAdminAuthenticated = true;
-  loginPanel.hidden = true;
-  uploadPanel.hidden = false;
-  managePanel.hidden = false;
-  editPanel.hidden = true;
+  element.textContent = '';
 }
 
 function requireToken() {
-  requireAdmin();
   const token = githubToken.value.trim();
   if (!token) throw new Error('Введите GitHub token.');
   return token;
@@ -104,6 +74,24 @@ function sanitizeFileName(name) {
     .replace(/[\\/:*?"<>|]/g, '')
     .replace(/\s+/g, ' ')
     .slice(0, 120);
+}
+
+function isValidDate(value) {
+  const match = String(value || '').trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) return false;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function appendTextElement(parent, tagName, text, className = '') {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+  return element;
 }
 
 function textToBase64(text) {
@@ -251,13 +239,25 @@ async function addChangelogEntry(entry, token) {
   cachedChangelogSha = result.content.sha;
 }
 
+async function tryAddChangelogEntry(entry, token) {
+  try {
+    await addChangelogEntry(entry, token);
+    return true;
+  } catch (error) {
+    console.error('Не удалось обновить историю изменений:', error);
+    return false;
+  }
+}
+
 function validateUploadForm() {
   if (!githubToken.value.trim()) return 'Введите GitHub token.';
   if (!docTitle.value.trim()) return 'Введите название документа.';
+  if (!sanitizeFileName(docTitle.value)) return 'Название документа должно содержать допустимые символы.';
   if (!docDescription.value.trim()) return 'Введите описание документа.';
   if (!docCategory.value.trim()) return 'Введите категорию.';
   if (!docAuthor.value.trim()) return 'Введите автора.';
   if (!docDate.value.trim()) return 'Введите дату загрузки.';
+  if (!isValidDate(docDate.value)) return 'Введите дату загрузки в формате ДД.ММ.ГГГГ.';
   if (!docVersion.value.trim()) return 'Введите версию документа.';
   if (!pdfFile.files[0]) return 'Выберите PDF-файл.';
   if (pdfFile.files[0].type !== 'application/pdf' && !pdfFile.files[0].name.toLowerCase().endsWith('.pdf')) {
@@ -273,16 +273,16 @@ function validateEditForm() {
   if (!editAuthor.value.trim()) return 'Введите автора.';
   if (!editUploadDate.value.trim()) return 'Введите дату загрузки.';
   if (!editUpdatedDate.value.trim()) return 'Введите дату обновления.';
+  if (!isValidDate(editUploadDate.value) || !isValidDate(editUpdatedDate.value)) return 'Введите даты в формате ДД.ММ.ГГГГ.';
   if (!editVersion.value.trim()) return 'Введите версию документа.';
   return null;
 }
 
 function renderManageList() {
-  if (!isAdminAuthenticated) return;
-  manageList.innerHTML = '';
+  manageList.replaceChildren();
 
   if (!cachedDocuments.length) {
-    manageList.innerHTML = '<p class="muted-text">Документы не найдены.</p>';
+    appendTextElement(manageList, 'p', 'Документы не найдены.', 'muted-text');
     return;
   }
 
@@ -290,23 +290,28 @@ function renderManageList() {
   for (const documentItem of sortDocuments(cachedDocuments)) {
     const item = document.createElement('article');
     item.className = 'manage-item';
-    item.innerHTML = `
-      <div>
-        <strong>${documentItem.title}</strong>
-        <p>${documentItem.description}</p>
-        <small>${documentItem.category} · версия ${documentItem.version || '1.0'} · ${documentItem.updatedDate || documentItem.uploadDate || ''}</small>
-      </div>
-      <div class="manage-actions">
-        <button type="button" data-action="edit" data-path="${documentItem.path}">Редактировать</button>
-        <button type="button" class="danger-button" data-action="delete" data-path="${documentItem.path}">Удалить</button>
-      </div>
-    `;
+    const content = document.createElement('div');
+    appendTextElement(content, 'strong', documentItem.title || 'Без названия');
+    appendTextElement(content, 'p', documentItem.description || '');
+    appendTextElement(content, 'small', `${documentItem.category || 'Без категории'} · версия ${documentItem.version || '1.0'} · ${documentItem.updatedDate || documentItem.uploadDate || ''}`);
+    item.appendChild(content);
+
+    const actions = document.createElement('div');
+    actions.className = 'manage-actions';
+    const editButton = appendTextElement(actions, 'button', 'Редактировать');
+    editButton.type = 'button';
+    editButton.dataset.action = 'edit';
+    editButton.dataset.path = documentItem.path;
+    const deleteButton = appendTextElement(actions, 'button', 'Удалить', 'danger-button');
+    deleteButton.type = 'button';
+    deleteButton.dataset.action = 'delete';
+    deleteButton.dataset.path = documentItem.path;
+    item.appendChild(actions);
     manageList.appendChild(item);
   }
 }
 
 async function refreshDocumentsList() {
-  requireAdmin();
   const token = requireToken();
   showStatus(manageStatusBox, '⏳ Загружаю список документов...', 'info');
   const loaded = await loadDocumentsFromGitHub(token);
@@ -317,7 +322,6 @@ async function refreshDocumentsList() {
 }
 
 function fillEditForm(documentItem) {
-  requireAdmin();
   editOriginalPath.value = documentItem.path;
   editTitle.value = documentItem.title || '';
   editDescription.value = documentItem.description || '';
@@ -331,24 +335,7 @@ function fillEditForm(documentItem) {
   editPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-loginButton.addEventListener('click', () => {
-  if (adminPassword.value !== ADMIN_PASSWORD) {
-    lockAdminPanels();
-    alert('Неверный пароль');
-    return;
-  }
-
-  unlockAdminPanels();
-});
-
 uploadButton.addEventListener('click', async () => {
-  try {
-    requireAdmin();
-  } catch (error) {
-    showStatus(statusBox, `🔐 ${error.message}`, 'error');
-    return;
-  }
-
   const validationError = validateUploadForm();
   if (validationError) {
     showStatus(statusBox, `⚠️ ${validationError}`, 'error');
@@ -363,17 +350,21 @@ uploadButton.addEventListener('click', async () => {
   uploadButton.disabled = true;
   showStatus(statusBox, '⏳ Загружаю PDF в репозиторий...', 'info');
 
+  let newPdfUpload = null;
+  let documentsSaved = false;
+
   try {
     const pdfContent = await fileToBase64(pdfFile.files[0]);
     const existingPdf = await getFileFromGitHub(pdfPath, token);
 
-    await putFileToGitHub(
+    const uploadResult = await putFileToGitHub(
       pdfPath,
       pdfContent,
       existingPdf ? `Обновлен PDF: ${title}` : `Добавлен PDF: ${title}`,
       token,
       existingPdf?.sha || null
     );
+    if (!existingPdf) newPdfUpload = uploadResult.content;
 
     showStatus(statusBox, '✅ PDF загружен. Обновляю список документов...', 'info');
 
@@ -396,15 +387,22 @@ uploadButton.addEventListener('click', async () => {
 
     const withoutDuplicate = cachedDocuments.filter((document) => document.path !== pdfPath && document.title !== title);
     await saveDocuments([...withoutDuplicate, newDocument], token, `Обновлен список документов: ${title}`);
+    documentsSaved = true;
 
-    await addChangelogEntry({
+    const changelogSaved = await tryAddChangelogEntry({
       date: docDate.value.trim(),
       title: `Добавлен документ: ${title}`,
       description: docDescription.value.trim()
     }, token);
 
     renderManageList();
-    showStatus(statusBox, '🎉 Готово! Документ загружен. На GitHub Pages он появится через 1–3 минуты. Обновите главную страницу через Ctrl + F5.', 'success');
+    showStatus(
+      statusBox,
+      changelogSaved
+        ? '🎉 Готово! Документ загружен. На GitHub Pages он появится через 1–3 минуты. Обновите главную страницу через Ctrl + F5.'
+        : '✅ Документ загружен, но историю изменений обновить не удалось. Сам документ появится на GitHub Pages через 1–3 минуты.',
+      changelogSaved ? 'success' : 'info'
+    );
 
     docTitle.value = '';
     docDescription.value = '';
@@ -413,7 +411,17 @@ uploadButton.addEventListener('click', async () => {
     docVersion.value = '1.0';
     docDate.value = todayRu();
   } catch (error) {
-    showStatus(statusBox, `❌ Ошибка: ${error.message}`, 'error');
+    let rollbackMessage = '';
+    if (newPdfUpload?.sha && !documentsSaved) {
+      try {
+        await deleteFileFromGitHub(pdfPath, `Откат незавершенной загрузки: ${title}`, token, newPdfUpload.sha);
+        rollbackMessage = ' Новый PDF удалён, незавершённые изменения отменены.';
+      } catch (rollbackError) {
+        console.error('Не удалось откатить загрузку PDF:', rollbackError);
+        rollbackMessage = ' Не удалось автоматически удалить загруженный PDF.';
+      }
+    }
+    showStatus(statusBox, `❌ Ошибка: ${error.message}${rollbackMessage}`, 'error');
   } finally {
     uploadButton.disabled = false;
   }
@@ -421,7 +429,6 @@ uploadButton.addEventListener('click', async () => {
 
 loadDocumentsButton.addEventListener('click', async () => {
   try {
-    requireAdmin();
     loadDocumentsButton.disabled = true;
     await refreshDocumentsList();
   } catch (error) {
@@ -432,13 +439,6 @@ loadDocumentsButton.addEventListener('click', async () => {
 });
 
 manageList.addEventListener('click', async (event) => {
-  try {
-    requireAdmin();
-  } catch (error) {
-    showStatus(manageStatusBox, `🔐 ${error.message}`, 'error');
-    return;
-  }
-
   const button = event.target.closest('button[data-action]');
   if (!button) return;
 
@@ -461,18 +461,18 @@ manageList.addEventListener('click', async (event) => {
       button.disabled = true;
       showStatus(manageStatusBox, '⏳ Удаляю документ...', 'info');
 
-      const existingPdf = await getFileFromGitHub(documentItem.path, token);
-      if (existingPdf?.sha) {
-        await deleteFileFromGitHub(documentItem.path, `Удален PDF: ${documentItem.title}`, token, existingPdf.sha);
-      }
-
       const loaded = await loadDocumentsFromGitHub(token);
       cachedDocuments = loaded.documents;
       cachedDocumentsSha = loaded.sha;
       const updatedDocuments = cachedDocuments.filter((item) => item.path !== documentItem.path);
       await saveDocuments(updatedDocuments, token, `Удалена карточка документа: ${documentItem.title}`);
 
-      await addChangelogEntry({
+      const existingPdf = await getFileFromGitHub(documentItem.path, token);
+      if (existingPdf?.sha) {
+        await deleteFileFromGitHub(documentItem.path, `Удален PDF: ${documentItem.title}`, token, existingPdf.sha);
+      }
+
+      const changelogSaved = await tryAddChangelogEntry({
         date: todayRu(),
         title: `Удален документ: ${documentItem.title}`,
         description: 'Документ удален из базы инструкций.'
@@ -480,7 +480,13 @@ manageList.addEventListener('click', async (event) => {
 
       renderManageList();
       editPanel.hidden = true;
-      showStatus(manageStatusBox, '✅ Документ удален. Изменения появятся на сайте через 1–3 минуты.', 'success');
+      showStatus(
+        manageStatusBox,
+        changelogSaved
+          ? '✅ Документ удален. Изменения появятся на сайте через 1–3 минуты.'
+          : '✅ Документ удален, но историю изменений обновить не удалось.',
+        changelogSaved ? 'success' : 'info'
+      );
     } catch (error) {
       showStatus(manageStatusBox, `❌ Ошибка: ${error.message}`, 'error');
     } finally {
@@ -490,13 +496,6 @@ manageList.addEventListener('click', async (event) => {
 });
 
 saveEditButton.addEventListener('click', async () => {
-  try {
-    requireAdmin();
-  } catch (error) {
-    showStatus(manageStatusBox, `🔐 ${error.message}`, 'error');
-    return;
-  }
-
   const validationError = validateEditForm();
   if (validationError) {
     showStatus(manageStatusBox, `⚠️ ${validationError}`, 'error');
@@ -531,7 +530,7 @@ saveEditButton.addEventListener('click', async () => {
     const updatedDocuments = cachedDocuments.map((item) => item.path === originalPath ? updatedDocument : item);
     await saveDocuments(updatedDocuments, token, `Отредактирована карточка: ${updatedDocument.title}`);
 
-    await addChangelogEntry({
+    const changelogSaved = await tryAddChangelogEntry({
       date: editUpdatedDate.value.trim(),
       title: `Обновлена карточка: ${updatedDocument.title}`,
       description: editDescription.value.trim()
@@ -539,7 +538,13 @@ saveEditButton.addEventListener('click', async () => {
 
     renderManageList();
     editPanel.hidden = true;
-    showStatus(manageStatusBox, '✅ Изменения сохранены. На сайте они появятся через 1–3 минуты.', 'success');
+    showStatus(
+      manageStatusBox,
+      changelogSaved
+        ? '✅ Изменения сохранены. На сайте они появятся через 1–3 минуты.'
+        : '✅ Карточка сохранена, но историю изменений обновить не удалось.',
+      changelogSaved ? 'success' : 'info'
+    );
   } catch (error) {
     showStatus(manageStatusBox, `❌ Ошибка: ${error.message}`, 'error');
   } finally {
@@ -548,10 +553,6 @@ saveEditButton.addEventListener('click', async () => {
 });
 
 cancelEditButton.addEventListener('click', () => {
-  if (!isAdminAuthenticated) return;
   editPanel.hidden = true;
   hideStatus(manageStatusBox);
 });
-
-// При открытии страницы админские действия всегда заблокированы до ввода пароля.
-lockAdminPanels();
