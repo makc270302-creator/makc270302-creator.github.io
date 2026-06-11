@@ -23,10 +23,15 @@
   <main class="container admin-page">
     <section id="uploadPanel" class="section-block admin-card">
       <h2>⬆️ Новый документ</h2>
-      <p>GitHub token не сохраняется на сайте. Его нужно вводить вручную при загрузке, редактировании или удалении.</p>
+      <p>Используйте fine-grained token только для этого репозитория с правом Contents: Read and write. Токен не сохраняется.</p>
 
-      <label for="githubToken">GitHub token</label>
-      <input id="githubToken" type="password" placeholder="github_pat_..." autocomplete="off" />
+      <div class="token-row">
+        <div>
+          <label for="githubToken">GitHub token</label>
+          <input id="githubToken" type="password" placeholder="github_pat_..." autocomplete="off" />
+        </div>
+        <button id="logoutButton" class="secondary-button" type="button">Очистить токен</button>
+      </div>
 
       <label for="docTitle">Название документа</label>
       <input id="docTitle" type="text" placeholder="Например: Вычерк" />
@@ -69,7 +74,7 @@
       <input id="pdfFile" type="file" accept="application/pdf,.pdf" />
 
       <button id="uploadButton" type="button">Загрузить документ</button>
-      <div id="statusBox" class="status-box" hidden></div>
+      <div id="statusBox" class="status-box" role="status" aria-live="polite" hidden></div>
     </section>
 
     <section id="managePanel" class="section-block admin-card">
@@ -82,12 +87,12 @@
       </div>
 
       <div id="manageList" class="manage-list"></div>
-      <div id="manageStatusBox" class="status-box" hidden></div>
+      <div id="manageStatusBox" class="status-box" role="status" aria-live="polite" hidden></div>
     </section>
 
     <section id="editPanel" class="section-block admin-card" hidden>
       <h2>✏️ Редактировать карточку</h2>
-      <p>Меняются только данные карточки. Сам PDF не перезагружается.</p>
+      <p>Можно изменить данные карточки и при необходимости заменить PDF.</p>
 
       <input id="editOriginalPath" type="hidden" />
 
@@ -114,6 +119,9 @@
 
       <label class="checkbox-row"><input id="editPopular" type="checkbox" /> Часто используемый документ</label>
 
+      <label for="editPdfFile">Заменить PDF (необязательно)</label>
+      <input id="editPdfFile" type="file" accept="application/pdf,.pdf" />
+
       <div class="admin-form-actions">
         <button id="saveEditButton" type="button">Сохранить изменения</button>
         <button id="cancelEditButton" class="secondary-button" type="button">Отмена</button>
@@ -121,6 +129,6 @@
     </section>
   </main>
 
-  <script src="admin.js"></script>
+  <script type="module" src="admin.js"></script>
 </body>
 </html>

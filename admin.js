@@ -1,3 +1,16 @@
+import {
+  appendTextElement,
+  base64ToText,
+  fileToBase64,
+  getDocumentPath,
+  isValidDate,
+  normalizeText,
+  sanitizeFileName,
+  sortDocuments,
+  textToBase64,
+  todayRu
+} from './common.js';
+
 const CONFIG = {
   owner: 'makc270302-creator',
   repo: 'makc270302-creator.github.io',
@@ -7,12 +20,8 @@ const CONFIG = {
   filesFolder: 'files'
 };
 
-const uploadPanel = document.getElementById('uploadPanel');
-const managePanel = document.getElementById('managePanel');
-const editPanel = document.getElementById('editPanel');
-
 const githubToken = document.getElementById('githubToken');
-
+const logoutButton = document.getElementById('logoutButton');
 const docTitle = document.getElementById('docTitle');
 const docDescription = document.getElementById('docDescription');
 const docCategory = document.getElementById('docCategory');
@@ -23,11 +32,10 @@ const docPopular = document.getElementById('docPopular');
 const pdfFile = document.getElementById('pdfFile');
 const uploadButton = document.getElementById('uploadButton');
 const statusBox = document.getElementById('statusBox');
-
 const loadDocumentsButton = document.getElementById('loadDocumentsButton');
 const manageList = document.getElementById('manageList');
 const manageStatusBox = document.getElementById('manageStatusBox');
-
+const editPanel = document.getElementById('editPanel');
 const editOriginalPath = document.getElementById('editOriginalPath');
 const editTitle = document.getElementById('editTitle');
 const editDescription = document.getElementById('editDescription');
@@ -37,17 +45,12 @@ const editUploadDate = document.getElementById('editUploadDate');
 const editUpdatedDate = document.getElementById('editUpdatedDate');
 const editVersion = document.getElementById('editVersion');
 const editPopular = document.getElementById('editPopular');
+const editPdfFile = document.getElementById('editPdfFile');
 const saveEditButton = document.getElementById('saveEditButton');
 const cancelEditButton = document.getElementById('cancelEditButton');
 
 let cachedDocuments = [];
-let cachedDocumentsSha = null;
 let cachedChangelog = [];
-let cachedChangelogSha = null;
-
-function todayRu() {
-  return new Date().toLocaleDateString('ru-RU');
-}
 
 docDate.value = todayRu();
 
@@ -68,54 +71,6 @@ function requireToken() {
   return token;
 }
 
-function sanitizeFileName(name) {
-  return name
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .slice(0, 120);
-}
-
-function isValidDate(value) {
-  const match = String(value || '').trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!match) return false;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
-function appendTextElement(parent, tagName, text, className = '') {
-  const element = document.createElement(tagName);
-  if (className) element.className = className;
-  element.textContent = text;
-  parent.appendChild(element);
-  return element;
-}
-
-function textToBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = '';
-  bytes.forEach((byte) => (binary += String.fromCharCode(byte)));
-  return btoa(binary);
-}
-
-function base64ToText(base64) {
-  const binary = atob(base64.replace(/\n/g, ''));
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 function githubHeaders(token) {
   return {
     Authorization: `Bearer ${token}`,
@@ -124,129 +79,99 @@ function githubHeaders(token) {
   };
 }
 
-function apiUrl(path) {
-  return `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+function repoApi(path) {
+  return `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/${path}`;
 }
 
-async function getFileFromGitHub(path, token) {
-  const response = await fetch(`${apiUrl(path)}?ref=${CONFIG.branch}`, {
-    headers: githubHeaders(token)
+async function githubRequest(path, token, options = {}) {
+  const response = await fetch(repoApi(path), {
+    ...options,
+    headers: {
+      ...githubHeaders(token),
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers
+    }
   });
-
-  if (response.status === 404) return null;
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || `Ошибка GitHub API: ${response.status}`);
   }
 
-  return response.json();
+  return response.status === 204 ? null : response.json();
 }
 
-async function putFileToGitHub(path, contentBase64, message, token, sha = null) {
-  const body = {
-    message,
-    content: contentBase64,
-    branch: CONFIG.branch
+async function getRepositoryFile(path, token) {
+  const encodedPath = encodeURIComponent(path).replace(/%2F/g, '/');
+  return githubRequest(`contents/${encodedPath}?ref=${CONFIG.branch}`, token);
+}
+
+async function loadRepositoryData(token) {
+  const [documentsFile, changelogFile] = await Promise.all([
+    getRepositoryFile(CONFIG.documentsPath, token),
+    getRepositoryFile(CONFIG.changelogPath, token)
+  ]);
+
+  const documents = JSON.parse(base64ToText(documentsFile.content));
+  for (const documentItem of documents) {
+    if (!getDocumentPath(documentItem)) {
+      throw new Error(`Недопустимый путь PDF у документа «${documentItem.title || 'Без названия'}».`);
+    }
+  }
+
+  return {
+    documents: sortDocuments(documents),
+    changelog: JSON.parse(base64ToText(changelogFile.content))
   };
+}
 
-  if (sha) body.sha = sha;
+async function createAtomicCommit(changes, message, token) {
+  const branchRef = await githubRequest(`git/ref/heads/${CONFIG.branch}`, token);
+  const parentSha = branchRef.object.sha;
+  const parentCommit = await githubRequest(`git/commits/${parentSha}`, token);
 
-  const response = await fetch(apiUrl(path), {
-    method: 'PUT',
-    headers: {
-      ...githubHeaders(token),
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
+  const treeEntries = await Promise.all(changes.map(async (change) => {
+    if (change.delete) {
+      return { path: change.path, mode: '100644', type: 'blob', sha: null };
+    }
+
+    const blob = await githubRequest('git/blobs', token, {
+      method: 'POST',
+      body: JSON.stringify({ content: change.contentBase64, encoding: 'base64' })
+    });
+    return { path: change.path, mode: '100644', type: 'blob', sha: blob.sha };
+  }));
+
+  const tree = await githubRequest('git/trees', token, {
+    method: 'POST',
+    body: JSON.stringify({ base_tree: parentCommit.tree.sha, tree: treeEntries })
+  });
+  const commit = await githubRequest('git/commits', token, {
+    method: 'POST',
+    body: JSON.stringify({ message, tree: tree.sha, parents: [parentSha] })
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Ошибка загрузки файла: ${response.status}`);
-  }
-
-  return response.json();
-}
-
-async function deleteFileFromGitHub(path, message, token, sha) {
-  const response = await fetch(apiUrl(path), {
-    method: 'DELETE',
-    headers: {
-      ...githubHeaders(token),
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ message, sha, branch: CONFIG.branch })
+  await githubRequest(`git/refs/heads/${CONFIG.branch}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify({ sha: commit.sha, force: false })
   });
+}
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Ошибка удаления файла: ${response.status}`);
+function jsonChange(path, data) {
+  return { path, contentBase64: textToBase64(`${JSON.stringify(data, null, 2)}\n`) };
+}
+
+function nextChangelog(entry) {
+  return [entry, ...cachedChangelog].slice(0, 30);
+}
+
+function validatePdf(file) {
+  if (!file) return null;
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    return 'Можно загружать только PDF-файлы.';
   }
-
-  return response.json();
-}
-
-async function loadDocumentsFromGitHub(token) {
-  const file = await getFileFromGitHub(CONFIG.documentsPath, token);
-  if (!file) return { documents: [], sha: null };
-  return { documents: JSON.parse(base64ToText(file.content)), sha: file.sha };
-}
-
-async function loadChangelogFromGitHub(token) {
-  const file = await getFileFromGitHub(CONFIG.changelogPath, token);
-  if (!file) return { changelog: [], sha: null };
-  return { changelog: JSON.parse(base64ToText(file.content)), sha: file.sha };
-}
-
-function sortDocuments(documents) {
-  return [...documents].sort((a, b) =>
-    a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' })
-  );
-}
-
-async function saveDocuments(documents, token, commitMessage) {
-  const sortedDocuments = sortDocuments(documents);
-  const result = await putFileToGitHub(
-    CONFIG.documentsPath,
-    textToBase64(JSON.stringify(sortedDocuments, null, 2)),
-    commitMessage,
-    token,
-    cachedDocumentsSha
-  );
-  cachedDocuments = sortedDocuments;
-  cachedDocumentsSha = result.content.sha;
-  return sortedDocuments;
-}
-
-async function addChangelogEntry(entry, token) {
-  if (!cachedChangelog.length && cachedChangelogSha === null) {
-    const loaded = await loadChangelogFromGitHub(token);
-    cachedChangelog = loaded.changelog;
-    cachedChangelogSha = loaded.sha;
-  }
-
-  const updatedChangelog = [entry, ...cachedChangelog].slice(0, 30);
-  const result = await putFileToGitHub(
-    CONFIG.changelogPath,
-    textToBase64(JSON.stringify(updatedChangelog, null, 2)),
-    `Обновлена история изменений: ${entry.title}`,
-    token,
-    cachedChangelogSha
-  );
-
-  cachedChangelog = updatedChangelog;
-  cachedChangelogSha = result.content.sha;
-}
-
-async function tryAddChangelogEntry(entry, token) {
-  try {
-    await addChangelogEntry(entry, token);
-    return true;
-  } catch (error) {
-    console.error('Не удалось обновить историю изменений:', error);
-    return false;
-  }
+  if (file.size > 50 * 1024 * 1024) return 'Размер PDF не должен превышать 50 МБ.';
+  return null;
 }
 
 function validateUploadForm() {
@@ -256,14 +181,10 @@ function validateUploadForm() {
   if (!docDescription.value.trim()) return 'Введите описание документа.';
   if (!docCategory.value.trim()) return 'Введите категорию.';
   if (!docAuthor.value.trim()) return 'Введите автора.';
-  if (!docDate.value.trim()) return 'Введите дату загрузки.';
   if (!isValidDate(docDate.value)) return 'Введите дату загрузки в формате ДД.ММ.ГГГГ.';
   if (!docVersion.value.trim()) return 'Введите версию документа.';
   if (!pdfFile.files[0]) return 'Выберите PDF-файл.';
-  if (pdfFile.files[0].type !== 'application/pdf' && !pdfFile.files[0].name.toLowerCase().endsWith('.pdf')) {
-    return 'Можно загружать только PDF-файлы.';
-  }
-  return null;
+  return validatePdf(pdfFile.files[0]);
 }
 
 function validateEditForm() {
@@ -271,29 +192,28 @@ function validateEditForm() {
   if (!editDescription.value.trim()) return 'Введите описание документа.';
   if (!editCategory.value.trim()) return 'Введите категорию.';
   if (!editAuthor.value.trim()) return 'Введите автора.';
-  if (!editUploadDate.value.trim()) return 'Введите дату загрузки.';
-  if (!editUpdatedDate.value.trim()) return 'Введите дату обновления.';
-  if (!isValidDate(editUploadDate.value) || !isValidDate(editUpdatedDate.value)) return 'Введите даты в формате ДД.ММ.ГГГГ.';
+  if (!isValidDate(editUploadDate.value) || !isValidDate(editUpdatedDate.value)) {
+    return 'Введите даты в формате ДД.ММ.ГГГГ.';
+  }
   if (!editVersion.value.trim()) return 'Введите версию документа.';
-  return null;
+  return validatePdf(editPdfFile.files[0]);
 }
 
 function renderManageList() {
   manageList.replaceChildren();
 
   if (!cachedDocuments.length) {
-    appendTextElement(manageList, 'p', 'Документы не найдены.', 'muted-text');
+    appendTextElement(manageList, 'p', 'Документы не загружены.', 'muted-text');
     return;
   }
 
-
-  for (const documentItem of sortDocuments(cachedDocuments)) {
+  for (const documentItem of cachedDocuments) {
     const item = document.createElement('article');
     item.className = 'manage-item';
     const content = document.createElement('div');
     appendTextElement(content, 'strong', documentItem.title || 'Без названия');
     appendTextElement(content, 'p', documentItem.description || '');
-    appendTextElement(content, 'small', `${documentItem.category || 'Без категории'} · версия ${documentItem.version || '1.0'} · ${documentItem.updatedDate || documentItem.uploadDate || ''}`);
+    appendTextElement(content, 'small', `${documentItem.category} · версия ${documentItem.version} · ${documentItem.updatedDate}`);
     item.appendChild(content);
 
     const actions = document.createElement('div');
@@ -311,14 +231,14 @@ function renderManageList() {
   }
 }
 
-async function refreshDocumentsList() {
+async function refreshDocumentsList({ quiet = false } = {}) {
   const token = requireToken();
-  showStatus(manageStatusBox, '⏳ Загружаю список документов...', 'info');
-  const loaded = await loadDocumentsFromGitHub(token);
-  cachedDocuments = sortDocuments(loaded.documents);
-  cachedDocumentsSha = loaded.sha;
+  if (!quiet) showStatus(manageStatusBox, 'Загружаю список документов...', 'info');
+  const loaded = await loadRepositoryData(token);
+  cachedDocuments = loaded.documents;
+  cachedChangelog = loaded.changelog;
   renderManageList();
-  showStatus(manageStatusBox, `✅ Список загружен. Документов: ${cachedDocuments.length}`, 'success');
+  showStatus(manageStatusBox, `Список загружен. Документов: ${cachedDocuments.length}`, 'success');
 }
 
 function fillEditForm(documentItem) {
@@ -326,194 +246,191 @@ function fillEditForm(documentItem) {
   editTitle.value = documentItem.title || '';
   editDescription.value = documentItem.description || '';
   editCategory.value = documentItem.category || '';
-  editAuthor.value = documentItem.author || 'Менеджер по стандартизации Ромашов М.С.';
+  editAuthor.value = documentItem.author || '';
   editUploadDate.value = documentItem.uploadDate || todayRu();
   editUpdatedDate.value = todayRu();
   editVersion.value = documentItem.version || '1.0';
   editPopular.checked = Boolean(documentItem.popular);
+  editPdfFile.value = '';
   editPanel.hidden = false;
+  editTitle.focus();
   editPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+function resetUploadForm() {
+  docTitle.value = '';
+  docDescription.value = '';
+  pdfFile.value = '';
+  docPopular.checked = false;
+  docVersion.value = '1.0';
+  docDate.value = todayRu();
+}
+
+githubToken.addEventListener('change', async () => {
+  if (!githubToken.value.trim()) return;
+  try {
+    await refreshDocumentsList({ quiet: true });
+  } catch (error) {
+    showStatus(manageStatusBox, `Не удалось проверить токен: ${error.message}`, 'error');
+  }
+});
+
+logoutButton.addEventListener('click', () => {
+  githubToken.value = '';
+  cachedDocuments = [];
+  cachedChangelog = [];
+  editPanel.hidden = true;
+  renderManageList();
+  hideStatus(statusBox);
+  showStatus(manageStatusBox, 'Токен очищен из текущей вкладки.', 'info');
+  githubToken.focus();
+});
+
+loadDocumentsButton.addEventListener('click', async () => {
+  loadDocumentsButton.disabled = true;
+  try {
+    await refreshDocumentsList();
+  } catch (error) {
+    showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error');
+  } finally {
+    loadDocumentsButton.disabled = false;
+  }
+});
 
 uploadButton.addEventListener('click', async () => {
   const validationError = validateUploadForm();
   if (validationError) {
-    showStatus(statusBox, `⚠️ ${validationError}`, 'error');
+    showStatus(statusBox, validationError, 'error');
     return;
   }
 
-  const token = githubToken.value.trim();
-  const title = docTitle.value.trim();
-  const fileName = `${sanitizeFileName(title)}.pdf`;
-  const pdfPath = `${CONFIG.filesFolder}/${fileName}`;
-
+  const token = requireToken();
   uploadButton.disabled = true;
-  showStatus(statusBox, '⏳ Загружаю PDF в репозиторий...', 'info');
-
-  let newPdfUpload = null;
-  let documentsSaved = false;
+  showStatus(statusBox, 'Создаю единый коммит с PDF, карточкой и историей...', 'info');
 
   try {
-    const pdfContent = await fileToBase64(pdfFile.files[0]);
-    const existingPdf = await getFileFromGitHub(pdfPath, token);
-
-    const uploadResult = await putFileToGitHub(
-      pdfPath,
-      pdfContent,
-      existingPdf ? `Обновлен PDF: ${title}` : `Добавлен PDF: ${title}`,
-      token,
-      existingPdf?.sha || null
-    );
-    if (!existingPdf) newPdfUpload = uploadResult.content;
-
-    showStatus(statusBox, '✅ PDF загружен. Обновляю список документов...', 'info');
-
-    const loaded = await loadDocumentsFromGitHub(token);
+    const loaded = await loadRepositoryData(token);
     cachedDocuments = loaded.documents;
-    cachedDocumentsSha = loaded.sha;
+    cachedChangelog = loaded.changelog;
 
-    const newDocument = {
+    const title = docTitle.value.trim();
+    const path = `${CONFIG.filesFolder}/${sanitizeFileName(title)}.pdf`;
+    const duplicate = cachedDocuments.find((item) =>
+      normalizeText(item.title) === normalizeText(title) || item.path === path
+    );
+    if (duplicate && !confirm(`Документ «${duplicate.title}» уже существует. Заменить его?`)) {
+      showStatus(statusBox, 'Загрузка отменена. Существующий документ не изменён.', 'info');
+      return;
+    }
+
+    const documentItem = {
       title,
       description: docDescription.value.trim(),
       category: docCategory.value.trim(),
       author: docAuthor.value.trim(),
-      uploadDate: docDate.value.trim(),
+      uploadDate: duplicate?.uploadDate || docDate.value.trim(),
       updatedDate: docDate.value.trim(),
       version: docVersion.value.trim(),
       popular: docPopular.checked,
       icon: '',
-      path: pdfPath
+      path
     };
-
-    const withoutDuplicate = cachedDocuments.filter((document) => document.path !== pdfPath && document.title !== title);
-    await saveDocuments([...withoutDuplicate, newDocument], token, `Обновлен список документов: ${title}`);
-    documentsSaved = true;
-
-    const changelogSaved = await tryAddChangelogEntry({
+    const documents = sortDocuments([
+      ...cachedDocuments.filter((item) => item.path !== duplicate?.path && normalizeText(item.title) !== normalizeText(title)),
+      documentItem
+    ]);
+    const changelog = nextChangelog({
       date: docDate.value.trim(),
-      title: `Добавлен документ: ${title}`,
+      title: `${duplicate ? 'Обновлён' : 'Добавлен'} документ: ${title}`,
       description: docDescription.value.trim()
-    }, token);
+    });
+    const pdfContent = await fileToBase64(pdfFile.files[0]);
+    const changes = [
+      { path, contentBase64: pdfContent },
+      jsonChange(CONFIG.documentsPath, documents),
+      jsonChange(CONFIG.changelogPath, changelog)
+    ];
+    if (duplicate?.path && duplicate.path !== path) changes.push({ path: duplicate.path, delete: true });
 
+    await createAtomicCommit(changes, `${duplicate ? 'Обновлён' : 'Добавлен'} документ: ${title}`, token);
+    cachedDocuments = documents;
+    cachedChangelog = changelog;
     renderManageList();
-    showStatus(
-      statusBox,
-      changelogSaved
-        ? '🎉 Готово! Документ загружен. На GitHub Pages он появится через 1–3 минуты. Обновите главную страницу через Ctrl + F5.'
-        : '✅ Документ загружен, но историю изменений обновить не удалось. Сам документ появится на GitHub Pages через 1–3 минуты.',
-      changelogSaved ? 'success' : 'info'
-    );
-
-    docTitle.value = '';
-    docDescription.value = '';
-    pdfFile.value = '';
-    docPopular.checked = false;
-    docVersion.value = '1.0';
-    docDate.value = todayRu();
+    resetUploadForm();
+    showStatus(statusBox, 'Готово. PDF, карточка и история сохранены одним коммитом.', 'success');
   } catch (error) {
-    let rollbackMessage = '';
-    if (newPdfUpload?.sha && !documentsSaved) {
-      try {
-        await deleteFileFromGitHub(pdfPath, `Откат незавершенной загрузки: ${title}`, token, newPdfUpload.sha);
-        rollbackMessage = ' Новый PDF удалён, незавершённые изменения отменены.';
-      } catch (rollbackError) {
-        console.error('Не удалось откатить загрузку PDF:', rollbackError);
-        rollbackMessage = ' Не удалось автоматически удалить загруженный PDF.';
-      }
-    }
-    showStatus(statusBox, `❌ Ошибка: ${error.message}${rollbackMessage}`, 'error');
+    showStatus(statusBox, `Ошибка: ${error.message}`, 'error');
   } finally {
     uploadButton.disabled = false;
-  }
-});
-
-loadDocumentsButton.addEventListener('click', async () => {
-  try {
-    loadDocumentsButton.disabled = true;
-    await refreshDocumentsList();
-  } catch (error) {
-    showStatus(manageStatusBox, `❌ Ошибка: ${error.message}`, 'error');
-  } finally {
-    loadDocumentsButton.disabled = false;
   }
 });
 
 manageList.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
-
-  const path = button.dataset.path;
-  const action = button.dataset.action;
-  const documentItem = cachedDocuments.find((item) => item.path === path);
+  const documentItem = cachedDocuments.find((item) => item.path === button.dataset.path);
   if (!documentItem) return;
 
-  if (action === 'edit') {
+  if (button.dataset.action === 'edit') {
     fillEditForm(documentItem);
     return;
   }
 
-  if (action === 'delete') {
-    const shouldDeletePdf = confirm(`Удалить карточку «${documentItem.title}»?\n\nOK — удалить карточку и сам PDF-файл.\nОтмена — ничего не удалять.`);
-    if (!shouldDeletePdf) return;
+  if (!confirm(`Удалить документ «${documentItem.title}» и его PDF?`)) return;
 
-    try {
-      const token = requireToken();
-      button.disabled = true;
-      showStatus(manageStatusBox, '⏳ Удаляю документ...', 'info');
+  button.disabled = true;
+  try {
+    const token = requireToken();
+    const loaded = await loadRepositoryData(token);
+    cachedDocuments = loaded.documents;
+    cachedChangelog = loaded.changelog;
+    const documents = cachedDocuments.filter((item) => item.path !== documentItem.path);
+    const changelog = nextChangelog({
+      date: todayRu(),
+      title: `Удалён документ: ${documentItem.title}`,
+      description: 'Документ удалён из базы инструкций.'
+    });
 
-      const loaded = await loadDocumentsFromGitHub(token);
-      cachedDocuments = loaded.documents;
-      cachedDocumentsSha = loaded.sha;
-      const updatedDocuments = cachedDocuments.filter((item) => item.path !== documentItem.path);
-      await saveDocuments(updatedDocuments, token, `Удалена карточка документа: ${documentItem.title}`);
+    await createAtomicCommit([
+      { path: documentItem.path, delete: true },
+      jsonChange(CONFIG.documentsPath, documents),
+      jsonChange(CONFIG.changelogPath, changelog)
+    ], `Удалён документ: ${documentItem.title}`, token);
 
-      const existingPdf = await getFileFromGitHub(documentItem.path, token);
-      if (existingPdf?.sha) {
-        await deleteFileFromGitHub(documentItem.path, `Удален PDF: ${documentItem.title}`, token, existingPdf.sha);
-      }
-
-      const changelogSaved = await tryAddChangelogEntry({
-        date: todayRu(),
-        title: `Удален документ: ${documentItem.title}`,
-        description: 'Документ удален из базы инструкций.'
-      }, token);
-
-      renderManageList();
-      editPanel.hidden = true;
-      showStatus(
-        manageStatusBox,
-        changelogSaved
-          ? '✅ Документ удален. Изменения появятся на сайте через 1–3 минуты.'
-          : '✅ Документ удален, но историю изменений обновить не удалось.',
-        changelogSaved ? 'success' : 'info'
-      );
-    } catch (error) {
-      showStatus(manageStatusBox, `❌ Ошибка: ${error.message}`, 'error');
-    } finally {
-      button.disabled = false;
-    }
+    cachedDocuments = documents;
+    cachedChangelog = changelog;
+    renderManageList();
+    editPanel.hidden = true;
+    showStatus(manageStatusBox, 'Документ и PDF удалены одним коммитом.', 'success');
+  } catch (error) {
+    showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 
 saveEditButton.addEventListener('click', async () => {
   const validationError = validateEditForm();
   if (validationError) {
-    showStatus(manageStatusBox, `⚠️ ${validationError}`, 'error');
+    showStatus(manageStatusBox, validationError, 'error');
     return;
   }
 
+  saveEditButton.disabled = true;
   try {
     const token = requireToken();
-    saveEditButton.disabled = true;
-    showStatus(manageStatusBox, '⏳ Сохраняю изменения карточки...', 'info');
-
-    const loaded = await loadDocumentsFromGitHub(token);
+    const loaded = await loadRepositoryData(token);
     cachedDocuments = loaded.documents;
-    cachedDocumentsSha = loaded.sha;
+    cachedChangelog = loaded.changelog;
 
     const originalPath = editOriginalPath.value;
     const existingDocument = cachedDocuments.find((item) => item.path === originalPath);
-    if (!existingDocument) throw new Error('Документ не найден в documents.json. Обновите список и попробуйте ещё раз.');
+    if (!existingDocument) throw new Error('Документ не найден. Обновите список и попробуйте снова.');
+
+    const duplicate = cachedDocuments.find((item) =>
+      item.path !== originalPath && normalizeText(item.title) === normalizeText(editTitle.value)
+    );
+    if (duplicate) throw new Error(`Название уже используется документом «${duplicate.title}».`);
 
     const updatedDocument = {
       ...existingDocument,
@@ -526,27 +443,30 @@ saveEditButton.addEventListener('click', async () => {
       version: editVersion.value.trim(),
       popular: editPopular.checked
     };
-
-    const updatedDocuments = cachedDocuments.map((item) => item.path === originalPath ? updatedDocument : item);
-    await saveDocuments(updatedDocuments, token, `Отредактирована карточка: ${updatedDocument.title}`);
-
-    const changelogSaved = await tryAddChangelogEntry({
+    const documents = sortDocuments(cachedDocuments.map((item) =>
+      item.path === originalPath ? updatedDocument : item
+    ));
+    const changelog = nextChangelog({
       date: editUpdatedDate.value.trim(),
       title: `Обновлена карточка: ${updatedDocument.title}`,
-      description: editDescription.value.trim()
-    }, token);
+      description: updatedDocument.description
+    });
+    const changes = [
+      jsonChange(CONFIG.documentsPath, documents),
+      jsonChange(CONFIG.changelogPath, changelog)
+    ];
+    if (editPdfFile.files[0]) {
+      changes.push({ path: originalPath, contentBase64: await fileToBase64(editPdfFile.files[0]) });
+    }
 
+    await createAtomicCommit(changes, `Обновлён документ: ${updatedDocument.title}`, token);
+    cachedDocuments = documents;
+    cachedChangelog = changelog;
     renderManageList();
     editPanel.hidden = true;
-    showStatus(
-      manageStatusBox,
-      changelogSaved
-        ? '✅ Изменения сохранены. На сайте они появятся через 1–3 минуты.'
-        : '✅ Карточка сохранена, но историю изменений обновить не удалось.',
-      changelogSaved ? 'success' : 'info'
-    );
+    showStatus(manageStatusBox, 'Изменения сохранены одним коммитом.', 'success');
   } catch (error) {
-    showStatus(manageStatusBox, `❌ Ошибка: ${error.message}`, 'error');
+    showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error');
   } finally {
     saveEditButton.disabled = false;
   }
@@ -554,5 +474,8 @@ saveEditButton.addEventListener('click', async () => {
 
 cancelEditButton.addEventListener('click', () => {
   editPanel.hidden = true;
+  editPdfFile.value = '';
   hideStatus(manageStatusBox);
 });
+
+renderManageList();

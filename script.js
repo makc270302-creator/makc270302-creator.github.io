@@ -1,3 +1,11 @@
+import {
+  appendTextElement,
+  getDocumentPath,
+  normalizeText,
+  parseDate,
+  sortDocuments
+} from './common.js';
+
 let files = [];
 let changelog = [];
 
@@ -37,50 +45,15 @@ const viewerActions = document.getElementById('viewerActions');
 const viewerOpen = document.getElementById('viewerOpen');
 const viewerDownload = document.getElementById('viewerDownload');
 const closeViewer = document.getElementById('closeViewer');
-
-function normalizeText(value) {
-  return String(value || '').toLowerCase().trim();
-}
-
-function appendTextElement(parent, tagName, text, className = '') {
-  const element = document.createElement(tagName);
-  if (className) element.className = className;
-  element.textContent = text;
-  parent.appendChild(element);
-  return element;
-}
-
-function parseDate(value) {
-  const text = String(value || '').trim();
-  const ruMatch = text.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  const parts = ruMatch
-    ? [Number(ruMatch[3]), Number(ruMatch[2]), Number(ruMatch[1])]
-    : isoMatch
-      ? [Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3])]
-      : null;
-
-  if (!parts) return null;
-
-  const [year, month, day] = parts;
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-    ? date
-    : null;
-}
-
-function getDocumentPath(file) {
-  const path = String(file.path || '').trim().replace(/\\/g, '/');
-  if (!/^files\/[^?#]+\.pdf$/i.test(path) || path.split('/').includes('..')) return null;
-  return encodeURI(path);
-}
+const viewerStatus = document.getElementById('viewerStatus');
+let viewerLoadTimer = null;
 
 function getCategoryIcon(category) {
   return CATEGORY_ICONS[category] || '📑';
 }
 
 function sortFiles() {
-  files.sort((a, b) => a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' }));
+  files = sortDocuments(files);
 }
 
 function setupCategories() {
@@ -141,7 +114,8 @@ function createMeta(file) {
 function createCard(file) {
   const card = document.createElement('article');
   card.className = 'file-card';
-  const encodedPath = getDocumentPath(file);
+  const path = getDocumentPath(file);
+  const encodedPath = path ? encodeURI(path) : null;
   const cardTop = document.createElement('div');
   cardTop.className = 'card-top';
   appendTextElement(cardTop, 'div', getCategoryIcon(file.category), 'file-icon');
@@ -230,32 +204,47 @@ function updateDashboard() {
 }
 
 function openViewer(file) {
-  const encodedPath = getDocumentPath(file);
-  if (!encodedPath) return;
+  const path = getDocumentPath(file);
+  if (!path) return;
+  const encodedPath = encodeURI(path);
   viewerTitle.textContent = file.title;
   viewerHint.hidden = true;
+  viewerStatus.hidden = false;
+  viewerStatus.textContent = 'Загрузка PDF...';
   pdfViewer.hidden = false;
   viewerActions.hidden = false;
   pdfViewer.src = encodedPath;
   viewerOpen.href = encodedPath;
   viewerDownload.href = encodedPath;
   viewerDownload.setAttribute('download', `${file.title}.pdf`);
+  clearTimeout(viewerLoadTimer);
+  viewerLoadTimer = setTimeout(() => {
+    viewerStatus.hidden = false;
+    viewerStatus.textContent = 'Если PDF не появился, откройте его в новой вкладке.';
+  }, 5000);
   document.querySelector('.viewer-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+pdfViewer.addEventListener('load', () => {
+  clearTimeout(viewerLoadTimer);
+  viewerStatus.hidden = true;
+});
+
 closeViewer.addEventListener('click', () => {
+  clearTimeout(viewerLoadTimer);
   pdfViewer.hidden = true;
   pdfViewer.src = '';
   viewerActions.hidden = true;
   viewerHint.hidden = false;
+  viewerStatus.hidden = true;
   viewerTitle.textContent = 'Выберите документ';
 });
 
 async function loadDocuments() {
   try {
     const [documentsResponse, changelogResponse] = await Promise.all([
-      fetch('documents.json?v=' + Date.now()),
-      fetch('changelog.json?v=' + Date.now())
+      fetch('documents.json', { cache: 'no-cache' }),
+      fetch('changelog.json', { cache: 'no-cache' })
     ]);
 
     if (!documentsResponse.ok) throw new Error('Не удалось загрузить documents.json');
@@ -282,4 +271,7 @@ async function loadDocuments() {
 
 searchInput.addEventListener('input', renderFiles);
 categoryFilter.addEventListener('change', renderFiles);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
+});
 loadDocuments();

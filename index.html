@@ -13,12 +13,12 @@
     <div class="hero__content">
       <div>
         <p class="eyebrow">Внутренняя база документов ООО "Разгуляй"</p>
-        <h1>PDF-инструкции v 1.8.8</h1>
+        <h1>PDF-инструкции v 2.0.0</h1>
         <p class="hero__text">Корпоративная база знаний: поиск, категории, версии документов, история изменений и просмотр PDF прямо на сайте.</p>
       </div>
       <div class="hero__actions">
         <div class="hero__badge">PDF</div>
-        <a class="admin-button" href="admin.html">🔐 Добавить документ</a>
+        <a class="admin-button" href="admin.html">Управление документами</a>
       </div>
     </div>
   </header>
@@ -33,7 +33,7 @@
     <section class="toolbar">
       <div class="search-box">
         <span>🔎</span>
-        <input id="searchInput" type="text" placeholder="Поиск по названию, описанию, автору или категории..." />
+        <input id="searchInput" type="search" aria-label="Поиск документов" placeholder="Поиск по названию, описанию, автору или категории..." />
       </div>
       <select id="categoryFilter" aria-label="Фильтр по категории">
         <option value="Все категории">Все категории</option>
@@ -77,10 +77,11 @@
             <span class="viewer-label">Предпросмотр PDF</span>
             <h2 id="viewerTitle">Выберите документ</h2>
           </div>
-          <button id="closeViewer" type="button" title="Очистить просмотр">×</button>
+          <button id="closeViewer" type="button" title="Очистить просмотр" aria-label="Закрыть просмотр PDF">×</button>
         </div>
         <p id="viewerHint">Нажмите «Просмотр» на любой карточке, и PDF откроется здесь.</p>
-        <iframe id="pdfViewer" title="Просмотр PDF" hidden></iframe>
+        <p id="viewerStatus" class="viewer-status" role="status" hidden></p>
+        <iframe id="pdfViewer" title="Просмотр PDF" loading="lazy" hidden></iframe>
         <div class="viewer-actions" id="viewerActions" hidden>
           <a id="viewerOpen" target="_blank" rel="noopener">Открыть в новой вкладке</a>
           <a id="viewerDownload" download>Скачать</a>
@@ -93,6 +94,6 @@
     <p>· База инструкций ·</p>
   </footer>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

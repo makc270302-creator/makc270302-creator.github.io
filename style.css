@@ -23,6 +23,25 @@ body {
   color: var(--text);
 }
 
+a,
+button,
+input,
+textarea,
+select {
+  transition: box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+button:disabled,
+.popular-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .hero {
   background: linear-gradient(135deg, #771313, #C62719);
   color: white;
@@ -226,6 +245,10 @@ select { padding: 0 14px; }
 
 .file-card h2 { margin: 0; font-size: 19px; line-height: 1.25; }
 .file-card p { margin: 0; color: var(--muted); line-height: 1.45; }
+.file-card h2,
+.file-card p,
+.manage-item strong,
+.manage-item p { overflow-wrap: anywhere; }
 
 .tag {
   width: fit-content;
@@ -307,6 +330,7 @@ select { padding: 0 14px; }
 }
 
 #viewerHint { color: var(--muted); line-height: 1.5; }
+.viewer-status { color: var(--muted); line-height: 1.5; }
 
 #pdfViewer {
   width: 100%;
@@ -393,6 +417,13 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
 }
 .checkbox-row { display: flex; align-items: center; gap: 10px; font-weight: 400 !important; }
 .checkbox-row input { width: auto; }
+.token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.token-row > div { display: grid; gap: 12px; }
 .status-box {
   border-radius: 14px;
   padding: 14px;
@@ -470,7 +501,8 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
 
 @media (max-width: 700px) {
   .admin-section-title,
-  .manage-item {
+  .manage-item,
+  .token-row {
     grid-template-columns: 1fr;
     display: grid;
   }
@@ -479,5 +511,14 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
   .admin-form-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

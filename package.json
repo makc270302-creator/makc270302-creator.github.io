@@ -1,0 +1,10 @@
+{
+  "name": "pdf-instructions-portal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:js": "node --check common.js && node --check script.js && node --check admin.js && node --check tools/validate-data.mjs",
+    "check:data": "node tools/validate-data.mjs",
+    "test": "npm run check:js && npm run check:data"
+  }
+}
