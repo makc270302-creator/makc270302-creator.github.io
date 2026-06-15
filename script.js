@@ -12,8 +12,10 @@ let changelog = [];
 let categoryIcons = {};
 const FAVORITES_KEY = 'pdf-portal-favorites';
 const VIEW_KEY = 'pdf-portal-view';
+const FILTERS_KEY = 'pdf-portal-filters';
 let favorites = new Set(readStoredArray(FAVORITES_KEY));
 let viewMode = readStoredValue(VIEW_KEY) === 'compact' ? 'compact' : 'cards';
+const storedFilters = readStoredObject(FILTERS_KEY);
 
 const fileList = document.getElementById('fileList');
 const popularList = document.getElementById('popularList');
@@ -52,12 +54,43 @@ function readStoredArray(key) {
   }
 }
 
+function readStoredObject(key) {
+  try {
+    const value = JSON.parse(readStoredValue(key) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
 function readStoredValue(key) {
   try {
     return localStorage.getItem(key);
   } catch {
     return null;
   }
+}
+
+function storeFilters() {
+  storeValue(FILTERS_KEY, JSON.stringify({
+    search: searchInput.value,
+    category: categoryFilter.value,
+    sort: sortFilter.value,
+    showArchived: showArchived.checked,
+    showFavorites: showFavorites.checked
+  }));
+}
+
+function applyStoredFilters() {
+  searchInput.value = typeof storedFilters.search === 'string' ? storedFilters.search : '';
+  if ([...categoryFilter.options].some((option) => option.value === storedFilters.category)) {
+    categoryFilter.value = storedFilters.category;
+  }
+  if ([...sortFilter.options].some((option) => option.value === storedFilters.sort)) {
+    sortFilter.value = storedFilters.sort;
+  }
+  showArchived.checked = storedFilters.showArchived === true;
+  showFavorites.checked = storedFilters.showFavorites === true;
 }
 
 function storeValue(key, value) {
@@ -217,7 +250,7 @@ function createCard(file) {
   previewButton.disabled = !encodedPath;
 
   if (encodedPath) {
-    const openLink = appendTextElement(actions, 'a', 'Открыть', 'open-link');
+    const openLink = appendTextElement(actions, 'a', 'Открыть', 'open-link action-secondary');
     openLink.href = encodedPath;
     openLink.target = '_blank';
     openLink.rel = 'noopener';
@@ -226,9 +259,24 @@ function createCard(file) {
     downloadLink.href = encodedPath;
     downloadLink.download = '';
 
-    const copyButton = appendTextElement(actions, 'button', 'Ссылка', 'copy-link');
+    const copyButton = appendTextElement(actions, 'button', 'Ссылка', 'copy-link action-secondary');
     copyButton.type = 'button';
     copyButton.addEventListener('click', () => copyDocumentLink(file, copyButton));
+
+    const mobileMenu = document.createElement('details');
+    mobileMenu.className = 'mobile-actions-menu';
+    appendTextElement(mobileMenu, 'summary', 'Ещё');
+    const mobileMenuItems = document.createElement('div');
+    mobileMenuItems.className = 'mobile-actions-menu__items';
+    const mobileOpenLink = appendTextElement(mobileMenuItems, 'a', 'Открыть в новой вкладке', 'open-link');
+    mobileOpenLink.href = encodedPath;
+    mobileOpenLink.target = '_blank';
+    mobileOpenLink.rel = 'noopener';
+    const mobileCopyButton = appendTextElement(mobileMenuItems, 'button', 'Копировать ссылку', 'copy-link');
+    mobileCopyButton.type = 'button';
+    mobileCopyButton.addEventListener('click', () => copyDocumentLink(file, mobileCopyButton));
+    mobileMenu.appendChild(mobileMenuItems);
+    actions.appendChild(mobileMenu);
   }
 
   previewButton.addEventListener('click', () => openViewer(file));
@@ -359,6 +407,7 @@ async function loadDocuments() {
 
     sortFiles();
     setupCategories();
+    applyStoredFilters();
     updateDashboard();
     renderPopular();
     renderFiles();
@@ -378,11 +427,16 @@ async function loadDocuments() {
   }
 }
 
-searchInput.addEventListener('input', renderFiles);
-categoryFilter.addEventListener('change', renderFiles);
-sortFilter.addEventListener('change', renderFiles);
-showArchived.addEventListener('change', renderFiles);
-showFavorites.addEventListener('change', renderFiles);
+function handleFiltersChange() {
+  storeFilters();
+  renderFiles();
+}
+
+searchInput.addEventListener('input', handleFiltersChange);
+categoryFilter.addEventListener('change', handleFiltersChange);
+sortFilter.addEventListener('change', handleFiltersChange);
+showArchived.addEventListener('change', handleFiltersChange);
+showFavorites.addEventListener('change', handleFiltersChange);
 cardViewButton.addEventListener('click', () => setViewMode('cards'));
 compactViewButton.addEventListener('click', () => setViewMode('compact'));
 viewerCopyLink.addEventListener('click', () => {
