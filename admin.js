@@ -36,6 +36,13 @@ const statusBox = document.getElementById('statusBox');
 const loadDocumentsButton = document.getElementById('loadDocumentsButton');
 const manageList = document.getElementById('manageList');
 const manageStatusBox = document.getElementById('manageStatusBox');
+const selectAllDocuments = document.getElementById('selectAllDocuments');
+const bulkCategory = document.getElementById('bulkCategory');
+const applyBulkCategoryButton = document.getElementById('applyBulkCategoryButton');
+const bulkArchiveButton = document.getElementById('bulkArchiveButton');
+const bulkRestoreButton = document.getElementById('bulkRestoreButton');
+const checkDuplicatesButton = document.getElementById('checkDuplicatesButton');
+const duplicateStatusBox = document.getElementById('duplicateStatusBox');
 const editPanel = document.getElementById('editPanel');
 const editOriginalPath = document.getElementById('editOriginalPath');
 const editTitle = document.getElementById('editTitle');
@@ -60,6 +67,7 @@ const categoryStatusBox = document.getElementById('categoryStatusBox');
 let cachedDocuments = [];
 let cachedChangelog = [];
 let cachedCategories = [];
+const selectedDocumentPaths = new Set();
 
 docDate.value = todayRu();
 
@@ -220,7 +228,14 @@ function renderManageList() {
 
   for (const documentItem of cachedDocuments) {
     const item = document.createElement('article');
-    item.className = 'manage-item';
+    item.className = 'manage-item manage-item--document';
+    const selection = document.createElement('input');
+    selection.type = 'checkbox';
+    selection.className = 'manage-select';
+    selection.checked = selectedDocumentPaths.has(documentItem.path);
+    selection.dataset.selectPath = documentItem.path;
+    selection.setAttribute('aria-label', `Выбрать документ: ${documentItem.title}`);
+    item.appendChild(selection);
     const content = document.createElement('div');
     appendTextElement(content, 'strong', documentItem.title || 'Без названия');
     appendTextElement(content, 'p', documentItem.description || '');
@@ -250,11 +265,18 @@ function renderManageList() {
 function renderCategories() {
   categorySuggestions.replaceChildren();
   categoryList.replaceChildren();
+  bulkCategory.replaceChildren();
+  const defaultBulkOption = document.createElement('option');
+  defaultBulkOption.value = '';
+  defaultBulkOption.textContent = 'Сменить категорию...';
+  bulkCategory.appendChild(defaultBulkOption);
 
   for (const category of cachedCategories) {
     const option = document.createElement('option');
     option.value = category.name;
     categorySuggestions.appendChild(option);
+    const bulkOption = option.cloneNode(true);
+    bulkCategory.appendChild(bulkOption);
 
     const item = document.createElement('article');
     item.className = 'manage-item';
@@ -276,6 +298,8 @@ async function refreshDocumentsList({ quiet = false } = {}) {
   cachedDocuments = loaded.documents;
   cachedChangelog = loaded.changelog;
   cachedCategories = loaded.categories;
+  selectedDocumentPaths.clear();
+  selectAllDocuments.checked = false;
   renderManageList();
   renderCategories();
   showStatus(manageStatusBox, `Список загружен. Документов: ${cachedDocuments.length}`, 'success');
@@ -307,6 +331,69 @@ function resetUploadForm() {
   docDate.value = todayRu();
 }
 
+function getDuplicateMessages() {
+  const messages = [];
+  const titleGroups = new Map();
+  const pathGroups = new Map();
+  cachedDocuments.forEach((item) => {
+    const titleKey = normalizeText(item.title);
+    const pathKey = normalizeText(item.path);
+    titleGroups.set(titleKey, [...(titleGroups.get(titleKey) || []), item.title]);
+    pathGroups.set(pathKey, [...(pathGroups.get(pathKey) || []), item.title]);
+  });
+  titleGroups.forEach((titles) => {
+    if (titles.length > 1) messages.push(`Повторяется название: ${titles.join(', ')}`);
+  });
+  pathGroups.forEach((titles, path) => {
+    if (titles.length > 1) messages.push(`Один PDF используется несколько раз (${path}): ${titles.join(', ')}`);
+  });
+  return messages;
+}
+
+async function applyBulkUpdate({ category = null, archived = null }) {
+  if (!selectedDocumentPaths.size) {
+    showStatus(manageStatusBox, 'Сначала выберите документы.', 'error');
+    return;
+  }
+  const token = requireToken();
+  const loaded = await loadRepositoryData(token);
+  cachedDocuments = loaded.documents;
+  cachedChangelog = loaded.changelog;
+  cachedCategories = loaded.categories;
+  const affected = cachedDocuments.filter((item) => selectedDocumentPaths.has(item.path));
+  if (!affected.length) throw new Error('Выбранные документы больше не найдены. Обновите список.');
+  if (category && !cachedCategories.some((item) => item.name === category)) {
+    throw new Error('Выбранная категория больше не существует. Обновите список.');
+  }
+  const documents = sortDocuments(cachedDocuments.map((item) => {
+    if (!selectedDocumentPaths.has(item.path)) return item;
+    return {
+      ...item,
+      ...(category ? { category } : {}),
+      ...(archived !== null ? { archived } : {}),
+      updatedDate: todayRu()
+    };
+  }));
+  const action = category
+    ? `Изменена категория на «${category}»`
+    : archived ? 'Архивированы документы' : 'Восстановлены документы';
+  const changelog = nextChangelog({
+    date: todayRu(),
+    title: `${action}: ${affected.length}`,
+    description: affected.map((item) => item.title).join(', ')
+  });
+  await createAtomicCommit([
+    jsonChange(CONFIG.documentsPath, documents),
+    jsonChange(CONFIG.changelogPath, changelog)
+  ], `${action}: ${affected.length}`, token);
+  cachedDocuments = documents;
+  cachedChangelog = changelog;
+  selectedDocumentPaths.clear();
+  selectAllDocuments.checked = false;
+  renderManageList();
+  showStatus(manageStatusBox, `${action}. Обновлено документов: ${affected.length}.`, 'success');
+}
+
 githubToken.addEventListener('change', async () => {
   if (!githubToken.value.trim()) return;
   try {
@@ -321,6 +408,8 @@ logoutButton.addEventListener('click', () => {
   cachedDocuments = [];
   cachedChangelog = [];
   cachedCategories = [];
+  selectedDocumentPaths.clear();
+  selectAllDocuments.checked = false;
   editPanel.hidden = true;
   renderManageList();
   renderCategories();
@@ -338,6 +427,50 @@ loadDocumentsButton.addEventListener('click', async () => {
   } finally {
     loadDocumentsButton.disabled = false;
   }
+});
+
+manageList.addEventListener('change', (event) => {
+  const checkbox = event.target.closest('input[data-select-path]');
+  if (!checkbox) return;
+  if (checkbox.checked) selectedDocumentPaths.add(checkbox.dataset.selectPath);
+  else selectedDocumentPaths.delete(checkbox.dataset.selectPath);
+  selectAllDocuments.checked = selectedDocumentPaths.size === cachedDocuments.length && cachedDocuments.length > 0;
+});
+
+selectAllDocuments.addEventListener('change', () => {
+  selectedDocumentPaths.clear();
+  if (selectAllDocuments.checked) cachedDocuments.forEach((item) => selectedDocumentPaths.add(item.path));
+  renderManageList();
+});
+
+applyBulkCategoryButton.addEventListener('click', async () => {
+  if (!bulkCategory.value) return showStatus(manageStatusBox, 'Выберите категорию.', 'error');
+  try {
+    await applyBulkUpdate({ category: bulkCategory.value });
+  } catch (error) {
+    showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error');
+  }
+});
+
+bulkArchiveButton.addEventListener('click', async () => {
+  try { await applyBulkUpdate({ archived: true }); } catch (error) { showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error'); }
+});
+
+bulkRestoreButton.addEventListener('click', async () => {
+  try { await applyBulkUpdate({ archived: false }); } catch (error) { showStatus(manageStatusBox, `Ошибка: ${error.message}`, 'error'); }
+});
+
+checkDuplicatesButton.addEventListener('click', () => {
+  if (!cachedDocuments.length) {
+    showStatus(duplicateStatusBox, 'Сначала загрузите список документов.', 'error');
+    return;
+  }
+  const messages = getDuplicateMessages();
+  showStatus(
+    duplicateStatusBox,
+    messages.length ? messages.join('\n') : 'Дубликаты названий и PDF-путей не найдены.',
+    messages.length ? 'error' : 'success'
+  );
 });
 
 uploadButton.addEventListener('click', async () => {
@@ -594,10 +727,17 @@ addCategoryButton.addEventListener('click', async () => {
     }
     const categories = [...cachedCategories, { name, icon }]
       .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    const changelog = nextChangelog({
+      date: todayRu(),
+      title: `Добавлена категория: ${name}`,
+      description: `Категория «${name}» добавлена в портал.`
+    });
     await createAtomicCommit([
-      jsonChange(CONFIG.categoriesPath, categories)
+      jsonChange(CONFIG.categoriesPath, categories),
+      jsonChange(CONFIG.changelogPath, changelog)
     ], `Добавлена категория: ${name}`, token);
     cachedCategories = categories;
+    cachedChangelog = changelog;
     renderCategories();
     categoryName.value = '';
     categoryIcon.value = '';
@@ -630,10 +770,17 @@ categoryList.addEventListener('click', async (event) => {
       throw new Error('Категория уже используется документом.');
     }
     const categories = cachedCategories.filter((category) => category.name !== name);
+    const changelog = nextChangelog({
+      date: todayRu(),
+      title: `Удалена категория: ${name}`,
+      description: `Неиспользуемая категория «${name}» удалена из портала.`
+    });
     await createAtomicCommit([
-      jsonChange(CONFIG.categoriesPath, categories)
+      jsonChange(CONFIG.categoriesPath, categories),
+      jsonChange(CONFIG.changelogPath, changelog)
     ], `Удалена категория: ${name}`, token);
     cachedCategories = categories;
+    cachedChangelog = changelog;
     renderCategories();
     showStatus(categoryStatusBox, 'Категория удалена.', 'success');
   } catch (error) {

@@ -293,6 +293,23 @@ select,
   font-weight: 700;
 }
 
+.show-more-button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.show-more-button:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
 .search-box,
 select {
   min-width: 0;
@@ -691,6 +708,17 @@ mark {
 .viewer-actions button { min-width: 0; border: 0; background: #475569; color: white; cursor: pointer; border-radius: 12px; font-weight: 700; padding: 11px 10px; overflow-wrap: anywhere; }
 .viewer-actions--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
+.related-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.related-section h3 { margin: 0 0 10px; font-size: 17px; }
+.related-list { display: grid; gap: 8px; }
+.related-list .recent-item { grid-template-columns: 36px minmax(0, 1fr); padding: 9px; }
+.related-list .recent-item__icon { width: 36px; height: 36px; font-size: 18px; }
+
 .timeline { display: grid; gap: 12px; }
 
 .timeline-item {
@@ -830,12 +858,28 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
   grid-template-columns: minmax(0, 1fr) 110px auto;
   gap: 10px;
 }
+.bulk-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) repeat(4, auto);
+  gap: 10px;
+  align-items: center;
+}
+.bulk-toolbar button {
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: var(--blue);
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
 .status-box {
   border-radius: 14px;
   padding: 14px;
   border: 1px solid var(--border);
   background: #f8fafc;
   line-height: 1.45;
+  white-space: pre-line;
 }
 .status-box--success { background: #dcfce7; border-color: #86efac; }
 .status-box--error { background: #fee2e2; border-color: #fca5a5; }
@@ -913,6 +957,7 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
     grid-template-columns: 1fr;
     display: grid;
   }
+  .bulk-toolbar { grid-template-columns: 1fr; }
 
   .manage-actions,
   .admin-form-actions {
@@ -920,6 +965,9 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
     grid-template-columns: 1fr;
   }
 }
+
+.manage-item--document { grid-template-columns: auto minmax(0, 1fr) auto; }
+.manage-select { width: 18px; height: 18px; }
 
 @media (prefers-reduced-motion: reduce) {
   *,

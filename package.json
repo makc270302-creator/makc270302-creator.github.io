@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:js": "node --check common.js && node --check script.js && node --check admin.js && node --check tools/validate-data.mjs",
+    "check:js": "node --check common.js && node --check script.js && node --check admin.js && node --check service-worker.js && node --check tools/validate-data.mjs && node --check tools/validate-portal.mjs",
     "check:data": "node tools/validate-data.mjs",
-    "test": "npm run check:js && npm run check:data"
+    "check:portal": "node tools/validate-portal.mjs",
+    "test": "npm run check:js && npm run check:data && npm run check:portal"
   }
 }

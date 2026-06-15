@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="referrer" content="same-origin" />
+  <meta name="theme-color" content="#991b1b" />
   <title>База PDF-инструкций</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Перейти к документам</a>
@@ -14,7 +16,7 @@
     <div class="hero__content">
       <div>
         <p class="eyebrow">Внутренняя база документов ООО "Разгуляй"</p>
-        <h1>PDF-инструкции v 2.3.1</h1>
+        <h1>PDF-инструкции v <span id="portalVersion">2.3.3</span></h1>
         <p class="hero__text">Корпоративная база знаний: поиск, категории, версии документов, история изменений и просмотр PDF прямо на сайте.</p>
       </div>
       <div class="hero__actions">
@@ -51,6 +53,7 @@
 
     <section class="view-toolbar" aria-label="Настройки отображения">
       <label class="archive-toggle"><input id="showFavorites" type="checkbox" /> Только избранное</label>
+      <button id="exportCsvButton" class="section-action-button" type="button">Экспорт CSV</button>
       <button id="resetFiltersButton" class="reset-filters-button" type="button" hidden>Сбросить фильтры</button>
       <div class="view-switcher" role="group" aria-label="Режим отображения">
         <button id="cardViewButton" type="button" aria-pressed="true">Карточки</button>
@@ -83,6 +86,7 @@
             <p id="documentsSummary" aria-live="polite">Активные документы.</p>
           </div>
           <section id="fileList" class="file-grid"></section>
+          <button id="showMoreFilesButton" class="show-more-button" type="button" hidden>Показать ещё</button>
           <section id="emptyState" class="empty-state" hidden>
             <h2>Ничего не найдено</h2>
             <p>Попробуйте изменить запрос или выбрать другую категорию.</p>
@@ -95,6 +99,7 @@
             <p>Последние обновления базы инструкций.</p>
           </div>
           <div id="changelogList" class="timeline"></div>
+          <button id="showMoreChangelogButton" class="show-more-button" type="button" hidden>Показать ещё</button>
         </section>
       </div>
 
@@ -114,6 +119,10 @@
           <a id="viewerDownload" download>Скачать</a>
           <button id="viewerCopyLink" type="button">Копировать ссылку</button>
         </div>
+        <section id="relatedSection" class="related-section" hidden>
+          <h3>Похожие документы</h3>
+          <div id="relatedList" class="related-list"></div>
+        </section>
       </aside>
     </section>
   </main>

@@ -14,10 +14,16 @@ const FAVORITES_KEY = 'pdf-portal-favorites';
 const VIEW_KEY = 'pdf-portal-view';
 const FILTERS_KEY = 'pdf-portal-filters';
 const RECENT_KEY = 'pdf-portal-recent';
+const VIEWS_KEY = 'pdf-portal-document-views';
+const FILES_PAGE_SIZE = 12;
+const CHANGELOG_PAGE_SIZE = 10;
 let favorites = new Set(readStoredArray(FAVORITES_KEY));
 let recentPaths = readStoredArray(RECENT_KEY);
+let documentViews = readStoredObject(VIEWS_KEY);
 let viewMode = readStoredValue(VIEW_KEY) === 'compact' ? 'compact' : 'cards';
 const storedFilters = readStoredObject(FILTERS_KEY);
+let visibleFilesCount = FILES_PAGE_SIZE;
+let visibleChangelogCount = CHANGELOG_PAGE_SIZE;
 
 const fileList = document.getElementById('fileList');
 const popularList = document.getElementById('popularList');
@@ -29,6 +35,7 @@ const showArchived = document.getElementById('showArchived');
 const documentsSummary = document.getElementById('documentsSummary');
 const showFavorites = document.getElementById('showFavorites');
 const resetFiltersButton = document.getElementById('resetFiltersButton');
+const exportCsvButton = document.getElementById('exportCsvButton');
 const activeFilters = document.getElementById('activeFilters');
 const cardViewButton = document.getElementById('cardViewButton');
 const compactViewButton = document.getElementById('compactViewButton');
@@ -36,10 +43,13 @@ const filesCount = document.getElementById('filesCount');
 const categoriesCount = document.getElementById('categoriesCount');
 const latestUpdate = document.getElementById('latestUpdate');
 const emptyState = document.getElementById('emptyState');
+const showMoreFilesButton = document.getElementById('showMoreFilesButton');
 const changelogList = document.getElementById('changelogList');
+const showMoreChangelogButton = document.getElementById('showMoreChangelogButton');
 const recentSection = document.getElementById('recentSection');
 const recentList = document.getElementById('recentList');
 const clearRecentButton = document.getElementById('clearRecentButton');
+const portalVersion = document.getElementById('portalVersion');
 const pdfViewer = document.getElementById('pdfViewer');
 const viewerTitle = document.getElementById('viewerTitle');
 const viewerHint = document.getElementById('viewerHint');
@@ -49,6 +59,8 @@ const viewerDownload = document.getElementById('viewerDownload');
 const viewerCopyLink = document.getElementById('viewerCopyLink');
 const closeViewer = document.getElementById('closeViewer');
 const viewerStatus = document.getElementById('viewerStatus');
+const relatedSection = document.getElementById('relatedSection');
+const relatedList = document.getElementById('relatedList');
 let viewerLoadTimer = null;
 let currentViewerFile = null;
 
@@ -118,9 +130,29 @@ function resetFilters() {
   sortFilter.value = 'title-asc';
   showArchived.checked = false;
   showFavorites.checked = false;
+  visibleFilesCount = FILES_PAGE_SIZE;
   storeFilters();
   updateResetFiltersButton();
   renderFiles();
+}
+
+function escapeCsv(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+function exportFilteredCsv() {
+  const rows = [['Название', 'Категория', 'Автор', 'Загружен', 'Обновлён', 'Версия', 'Архив', 'Путь']];
+  getFilteredFiles().forEach((file) => rows.push([
+    file.title, file.category, file.author, file.uploadDate, file.updatedDate,
+    file.version, file.archived ? 'Да' : 'Нет', getDocumentPath(file) || ''
+  ]));
+  const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(';')).join('\r\n')}`;
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  link.href = url;
+  link.download = `documents-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function appendHighlightedText(parent, tagName, text, className = '') {
@@ -427,11 +459,18 @@ function renderFiles() {
   emptyState.hidden = filteredFiles.length > 0;
   renderActiveFilters();
 
-  filteredFiles.forEach((file) => fileList.appendChild(createCard(file)));
+  filteredFiles.slice(0, visibleFilesCount).forEach((file) => fileList.appendChild(createCard(file)));
+  showMoreFilesButton.hidden = filteredFiles.length <= visibleFilesCount;
+  showMoreFilesButton.textContent = `Показать ещё (${filteredFiles.length - visibleFilesCount})`;
 }
 
 function renderPopular() {
-  const popularFiles = files.filter((file) => file.popular && !file.archived).slice(0, 6);
+  const popularFiles = files
+    .filter((file) => !file.archived)
+    .sort((a, b) => (Number(documentViews[getDocumentPath(b)] || 0) - Number(documentViews[getDocumentPath(a)] || 0))
+      || (Number(Boolean(b.popular)) - Number(Boolean(a.popular)))
+      || String(a.title).localeCompare(String(b.title), 'ru'))
+    .slice(0, 6);
   popularList.replaceChildren();
   popularSection.hidden = popularFiles.length === 0;
   popularFiles.forEach((file) => popularList.appendChild(createPopularCard(file)));
@@ -440,7 +479,7 @@ function renderPopular() {
 function renderChangelog() {
   changelogList.replaceChildren();
 
-  changelog.forEach((item) => {
+  changelog.slice(0, visibleChangelogCount).forEach((item) => {
     const node = document.createElement('article');
     node.className = 'timeline-item';
     appendTextElement(node, 'time', item.date || '—');
@@ -450,6 +489,17 @@ function renderChangelog() {
     node.appendChild(content);
     changelogList.appendChild(node);
   });
+  showMoreChangelogButton.hidden = changelog.length <= visibleChangelogCount;
+  showMoreChangelogButton.textContent = `Показать ещё (${changelog.length - visibleChangelogCount})`;
+}
+
+function renderRelated(file) {
+  const relatedFiles = files
+    .filter((item) => !item.archived && item.category === file.category && getDocumentPath(item) !== getDocumentPath(file))
+    .slice(0, 4);
+  relatedList.replaceChildren();
+  relatedSection.hidden = relatedFiles.length === 0;
+  relatedFiles.forEach((item) => relatedList.appendChild(createRecentItem(item)));
 }
 
 function updateDashboard() {
@@ -470,7 +520,12 @@ function openViewer(file) {
   if (!path) return;
   const encodedPath = encodeURI(path);
   currentViewerFile = file;
+  const pathViews = getDocumentPath(file);
+  documentViews[pathViews] = Number(documentViews[pathViews] || 0) + 1;
+  storeValue(VIEWS_KEY, JSON.stringify(documentViews));
   recordRecent(file);
+  renderPopular();
+  renderRelated(file);
   viewerTitle.textContent = file.title;
   viewerHint.hidden = true;
   viewerStatus.hidden = false;
@@ -506,6 +561,8 @@ closeViewer.addEventListener('click', () => {
   viewerStatus.hidden = true;
   viewerTitle.textContent = 'Выберите документ';
   currentViewerFile = null;
+  relatedSection.hidden = true;
+  relatedList.replaceChildren();
   const url = new URL(window.location.href);
   url.searchParams.delete('document');
   history.replaceState(null, '', url);
@@ -513,10 +570,11 @@ closeViewer.addEventListener('click', () => {
 
 async function loadDocuments() {
   try {
-    const [documentsResponse, changelogResponse, categoriesResponse] = await Promise.all([
+    const [documentsResponse, changelogResponse, categoriesResponse, appResponse] = await Promise.all([
       fetch('documents.json', { cache: 'no-cache' }),
       fetch('changelog.json', { cache: 'no-cache' }),
-      fetch('categories.json', { cache: 'no-cache' })
+      fetch('categories.json', { cache: 'no-cache' }),
+      fetch('app.json', { cache: 'no-cache' })
     ]);
 
     if (!documentsResponse.ok) throw new Error('Не удалось загрузить documents.json');
@@ -524,7 +582,9 @@ async function loadDocuments() {
     files = await documentsResponse.json();
     changelog = changelogResponse.ok ? await changelogResponse.json() : [];
     const categories = categoriesResponse.ok ? await categoriesResponse.json() : [];
+    const appConfig = appResponse.ok ? await appResponse.json() : {};
     categoryIcons = Object.fromEntries(categories.map((category) => [category.name, category.icon]));
+    portalVersion.textContent = appConfig.version || portalVersion.textContent;
 
     sortFiles();
     setupCategories();
@@ -551,6 +611,7 @@ async function loadDocuments() {
 }
 
 function handleFiltersChange() {
+  visibleFilesCount = FILES_PAGE_SIZE;
   storeFilters();
   updateResetFiltersButton();
   renderFiles();
@@ -562,6 +623,15 @@ sortFilter.addEventListener('change', handleFiltersChange);
 showArchived.addEventListener('change', handleFiltersChange);
 showFavorites.addEventListener('change', handleFiltersChange);
 resetFiltersButton.addEventListener('click', resetFilters);
+exportCsvButton.addEventListener('click', exportFilteredCsv);
+showMoreFilesButton.addEventListener('click', () => {
+  visibleFilesCount += FILES_PAGE_SIZE;
+  renderFiles();
+});
+showMoreChangelogButton.addEventListener('click', () => {
+  visibleChangelogCount += CHANGELOG_PAGE_SIZE;
+  renderChangelog();
+});
 clearRecentButton.addEventListener('click', () => {
   recentPaths = [];
   storeValue(RECENT_KEY, '[]');
@@ -575,4 +645,5 @@ viewerCopyLink.addEventListener('click', () => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
 loadDocuments();

@@ -85,8 +85,19 @@
         </div>
         <button id="loadDocumentsButton" type="button">Обновить список</button>
       </div>
+      <div class="bulk-toolbar">
+        <label class="checkbox-row"><input id="selectAllDocuments" type="checkbox" /> Выбрать все</label>
+        <select id="bulkCategory" aria-label="Категория для выбранных документов">
+          <option value="">Сменить категорию...</option>
+        </select>
+        <button id="applyBulkCategoryButton" type="button">Применить категорию</button>
+        <button id="bulkArchiveButton" class="secondary-button" type="button">В архив</button>
+        <button id="bulkRestoreButton" class="secondary-button" type="button">Вернуть</button>
+        <button id="checkDuplicatesButton" class="secondary-button" type="button">Проверить дубликаты</button>
+      </div>
 
       <div id="manageList" class="manage-list"></div>
+      <div id="duplicateStatusBox" class="status-box" role="status" aria-live="polite" hidden></div>
       <div id="manageStatusBox" class="status-box" role="status" aria-live="polite" hidden></div>
     </section>
 
