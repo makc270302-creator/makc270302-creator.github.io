@@ -13,7 +13,9 @@ let categoryIcons = {};
 const FAVORITES_KEY = 'pdf-portal-favorites';
 const VIEW_KEY = 'pdf-portal-view';
 const FILTERS_KEY = 'pdf-portal-filters';
+const RECENT_KEY = 'pdf-portal-recent';
 let favorites = new Set(readStoredArray(FAVORITES_KEY));
+let recentPaths = readStoredArray(RECENT_KEY);
 let viewMode = readStoredValue(VIEW_KEY) === 'compact' ? 'compact' : 'cards';
 const storedFilters = readStoredObject(FILTERS_KEY);
 
@@ -26,6 +28,8 @@ const sortFilter = document.getElementById('sortFilter');
 const showArchived = document.getElementById('showArchived');
 const documentsSummary = document.getElementById('documentsSummary');
 const showFavorites = document.getElementById('showFavorites');
+const resetFiltersButton = document.getElementById('resetFiltersButton');
+const activeFilters = document.getElementById('activeFilters');
 const cardViewButton = document.getElementById('cardViewButton');
 const compactViewButton = document.getElementById('compactViewButton');
 const filesCount = document.getElementById('filesCount');
@@ -33,6 +37,9 @@ const categoriesCount = document.getElementById('categoriesCount');
 const latestUpdate = document.getElementById('latestUpdate');
 const emptyState = document.getElementById('emptyState');
 const changelogList = document.getElementById('changelogList');
+const recentSection = document.getElementById('recentSection');
+const recentList = document.getElementById('recentList');
+const clearRecentButton = document.getElementById('clearRecentButton');
 const pdfViewer = document.getElementById('pdfViewer');
 const viewerTitle = document.getElementById('viewerTitle');
 const viewerHint = document.getElementById('viewerHint');
@@ -91,6 +98,53 @@ function applyStoredFilters() {
   }
   showArchived.checked = storedFilters.showArchived === true;
   showFavorites.checked = storedFilters.showFavorites === true;
+}
+
+function hasActiveFilters() {
+  return Boolean(searchInput.value.trim())
+    || categoryFilter.value !== 'Все категории'
+    || sortFilter.value !== 'title-asc'
+    || showArchived.checked
+    || showFavorites.checked;
+}
+
+function updateResetFiltersButton() {
+  resetFiltersButton.hidden = !hasActiveFilters();
+}
+
+function resetFilters() {
+  searchInput.value = '';
+  categoryFilter.value = 'Все категории';
+  sortFilter.value = 'title-asc';
+  showArchived.checked = false;
+  showFavorites.checked = false;
+  storeFilters();
+  updateResetFiltersButton();
+  renderFiles();
+}
+
+function appendHighlightedText(parent, tagName, text, className = '') {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  const query = searchInput.value.trim();
+
+  if (!query) {
+    element.textContent = text;
+    parent.appendChild(element);
+    return element;
+  }
+
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  let cursor = 0;
+  String(text).replace(pattern, (match, offset) => {
+    element.append(document.createTextNode(String(text).slice(cursor, offset)));
+    appendTextElement(element, 'mark', match);
+    cursor = offset + match.length;
+    return match;
+  });
+  element.append(document.createTextNode(String(text).slice(cursor)));
+  parent.appendChild(element);
+  return element;
 }
 
 function storeValue(key, value) {
@@ -163,11 +217,19 @@ function setupCategories() {
     .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
 
   categoryFilter.replaceChildren();
+  const categoryCounts = files.reduce((counts, file) => {
+    if (file.archived || !file.category) return counts;
+    counts[file.category] = (counts[file.category] || 0) + 1;
+    return counts;
+  }, {});
+  const activeCount = files.filter((file) => !file.archived).length;
 
   ['Все категории', ...uniqueCategories].forEach((category) => {
     const option = document.createElement('option');
     option.value = category;
-    option.textContent = category === 'Все категории' ? category : `${getCategoryIcon(category)} ${category}`;
+    option.textContent = category === 'Все категории'
+      ? `${category} · ${activeCount}`
+      : `${getCategoryIcon(category)} ${category} · ${categoryCounts[category] || 0}`;
     categoryFilter.appendChild(option);
   });
 
@@ -239,8 +301,8 @@ function createCard(file) {
   favoriteButton.setAttribute('aria-label', favoriteButton.title);
   favoriteButton.addEventListener('click', () => toggleFavorite(file));
   card.appendChild(cardTop);
-  appendTextElement(card, 'h2', file.title || 'Без названия');
-  appendTextElement(card, 'p', file.description || '');
+  appendHighlightedText(card, 'h2', file.title || 'Без названия');
+  appendHighlightedText(card, 'p', file.description || '');
   card.appendChild(createMeta(file));
 
   const actions = document.createElement('div');
@@ -296,6 +358,63 @@ function createPopularCard(file) {
   return item;
 }
 
+function createRecentItem(file) {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = 'recent-item';
+  appendTextElement(item, 'span', getCategoryIcon(file.category), 'recent-item__icon');
+  const content = document.createElement('span');
+  content.className = 'recent-item__content';
+  appendTextElement(content, 'strong', file.title || 'Без названия');
+  appendTextElement(content, 'small', `${file.category || 'Без категории'} · обновлён ${file.updatedDate || file.uploadDate || '—'}`);
+  item.appendChild(content);
+  item.addEventListener('click', () => openViewer(file));
+  return item;
+}
+
+function recordRecent(file) {
+  const path = getDocumentPath(file);
+  if (!path) return;
+  recentPaths = [path, ...recentPaths.filter((item) => item !== path)].slice(0, 6);
+  storeValue(RECENT_KEY, JSON.stringify(recentPaths));
+  renderRecent();
+}
+
+function renderRecent() {
+  const recentFiles = recentPaths
+    .map((path) => files.find((file) => getDocumentPath(file) === path))
+    .filter(Boolean);
+  recentList.replaceChildren();
+  recentSection.hidden = recentFiles.length === 0;
+  recentFiles.forEach((file) => recentList.appendChild(createRecentItem(file)));
+}
+
+function addFilterChip(label, clearFilter) {
+  const button = appendTextElement(activeFilters, 'button', `${label} ×`, 'filter-chip');
+  button.type = 'button';
+  button.setAttribute('aria-label', `Убрать фильтр: ${label}`);
+  button.addEventListener('click', () => {
+    clearFilter();
+    handleFiltersChange();
+  });
+}
+
+function renderActiveFilters() {
+  activeFilters.replaceChildren();
+
+  if (searchInput.value.trim()) addFilterChip(`Поиск: ${searchInput.value.trim()}`, () => { searchInput.value = ''; });
+  if (categoryFilter.value !== 'Все категории') addFilterChip(`Категория: ${categoryFilter.value}`, () => { categoryFilter.value = 'Все категории'; });
+  if (showArchived.checked) addFilterChip('Показан архив', () => { showArchived.checked = false; });
+  if (showFavorites.checked) addFilterChip('Только избранное', () => { showFavorites.checked = false; });
+
+  if (sortFilter.value !== 'title-asc') {
+    const selectedSort = sortFilter.options[sortFilter.selectedIndex]?.textContent || 'Изменена сортировка';
+    addFilterChip(`Сортировка: ${selectedSort}`, () => { sortFilter.value = 'title-asc'; });
+  }
+
+  activeFilters.hidden = activeFilters.childElementCount === 0;
+}
+
 function renderFiles() {
   const filteredFiles = getFilteredFiles();
   const availableFiles = showArchived.checked ? files : files.filter((file) => !file.archived);
@@ -306,6 +425,7 @@ function renderFiles() {
     ? 'Показаны активные и архивные документы.'
     : showFavorites.checked ? 'Показаны только избранные документы.' : 'Архивные документы скрыты.';
   emptyState.hidden = filteredFiles.length > 0;
+  renderActiveFilters();
 
   filteredFiles.forEach((file) => fileList.appendChild(createCard(file)));
 }
@@ -350,6 +470,7 @@ function openViewer(file) {
   if (!path) return;
   const encodedPath = encodeURI(path);
   currentViewerFile = file;
+  recordRecent(file);
   viewerTitle.textContent = file.title;
   viewerHint.hidden = true;
   viewerStatus.hidden = false;
@@ -408,8 +529,10 @@ async function loadDocuments() {
     sortFiles();
     setupCategories();
     applyStoredFilters();
+    updateResetFiltersButton();
     updateDashboard();
     renderPopular();
+    renderRecent();
     renderFiles();
     renderChangelog();
     setViewMode(viewMode);
@@ -429,6 +552,7 @@ async function loadDocuments() {
 
 function handleFiltersChange() {
   storeFilters();
+  updateResetFiltersButton();
   renderFiles();
 }
 
@@ -437,6 +561,12 @@ categoryFilter.addEventListener('change', handleFiltersChange);
 sortFilter.addEventListener('change', handleFiltersChange);
 showArchived.addEventListener('change', handleFiltersChange);
 showFavorites.addEventListener('change', handleFiltersChange);
+resetFiltersButton.addEventListener('click', resetFilters);
+clearRecentButton.addEventListener('click', () => {
+  recentPaths = [];
+  storeValue(RECENT_KEY, '[]');
+  renderRecent();
+});
 cardViewButton.addEventListener('click', () => setViewMode('cards'));
 compactViewButton.addEventListener('click', () => setViewMode('compact'));
 viewerCopyLink.addEventListener('click', () => {

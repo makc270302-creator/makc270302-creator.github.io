@@ -9,11 +9,12 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <a class="skip-link" href="#mainContent">Перейти к документам</a>
   <header class="hero">
     <div class="hero__content">
       <div>
         <p class="eyebrow">Внутренняя база документов ООО "Разгуляй"</p>
-        <h1>PDF-инструкции v 2.3.0</h1>
+        <h1>PDF-инструкции v 2.3.1</h1>
         <p class="hero__text">Корпоративная база знаний: поиск, категории, версии документов, история изменений и просмотр PDF прямо на сайте.</p>
       </div>
       <div class="hero__actions">
@@ -23,7 +24,7 @@
     </div>
   </header>
 
-  <main class="container">
+  <main id="mainContent" class="container">
     <section class="dashboard">
       <div class="dashboard-card"><strong id="filesCount">0 / 0</strong><span>найдено / всего файлов</span></div>
       <div class="dashboard-card"><strong id="categoriesCount">0</strong><span>категорий</span></div>
@@ -32,7 +33,7 @@
 
     <section class="toolbar toolbar--extended">
       <div class="search-box">
-        <span>🔎</span>
+        <span aria-hidden="true">🔎</span>
         <input id="searchInput" type="search" aria-label="Поиск документов" placeholder="Поиск по названию, описанию, автору или категории..." />
       </div>
       <select id="categoryFilter" aria-label="Фильтр по категории">
@@ -50,11 +51,13 @@
 
     <section class="view-toolbar" aria-label="Настройки отображения">
       <label class="archive-toggle"><input id="showFavorites" type="checkbox" /> Только избранное</label>
+      <button id="resetFiltersButton" class="reset-filters-button" type="button" hidden>Сбросить фильтры</button>
       <div class="view-switcher" role="group" aria-label="Режим отображения">
         <button id="cardViewButton" type="button" aria-pressed="true">Карточки</button>
         <button id="compactViewButton" type="button" aria-pressed="false">Компактно</button>
       </div>
     </section>
+    <div id="activeFilters" class="active-filters" aria-label="Активные фильтры" aria-live="polite" hidden></div>
 
     <section class="layout">
       <div class="content-column">
@@ -66,10 +69,18 @@
           <div id="popularList" class="popular-grid"></div>
         </section>
 
+        <section class="section-block" id="recentSection" hidden>
+          <div class="section-title">
+            <h2>Недавно просмотренные</h2>
+            <button id="clearRecentButton" class="section-action-button" type="button">Очистить</button>
+          </div>
+          <div id="recentList" class="recent-list"></div>
+        </section>
+
         <section class="section-block">
           <div class="section-title">
             <h2>📚 Все документы</h2>
-            <p id="documentsSummary">Активные документы.</p>
+            <p id="documentsSummary" aria-live="polite">Активные документы.</p>
           </div>
           <section id="fileList" class="file-grid"></section>
           <section id="emptyState" class="empty-state" hidden>
