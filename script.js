@@ -16,9 +16,10 @@ const FILTERS_KEY = 'pdf-portal-filters';
 const RECENT_KEY = 'pdf-portal-recent';
 const VIEWS_KEY = 'pdf-portal-document-views';
 const AUTH_LOGIN_KEY = 'pdf-portal-login';
-const USERS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ppTZqoJTEvqy5m0LEkm0gpZNJKU_taTGX6ZWBwb8-xk/gviz/tq?sheet=%D0%9F%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D0%B8';
 const FILES_PAGE_SIZE = 12;
 const CHANGELOG_PAGE_SIZE = 10;
+let authEndpoint = '';
+let authMode = 'login';
 let favorites = new Set(readStoredArray(FAVORITES_KEY));
 let recentPaths = readStoredArray(RECENT_KEY);
 let documentViews = readStoredObject(VIEWS_KEY);
@@ -28,7 +29,13 @@ let visibleFilesCount = FILES_PAGE_SIZE;
 let visibleChangelogCount = CHANGELOG_PAGE_SIZE;
 
 const authForm = document.getElementById('authForm');
+const authTitle = document.getElementById('authTitle');
+const loginModeButton = document.getElementById('loginModeButton');
+const registerModeButton = document.getElementById('registerModeButton');
 const loginInput = document.getElementById('loginInput');
+const passwordInput = document.getElementById('passwordInput');
+const confirmPasswordField = document.getElementById('confirmPasswordField');
+const confirmPasswordInput = document.getElementById('confirmPasswordInput');
 const authMessage = document.getElementById('authMessage');
 const authSubmit = document.getElementById('authSubmit');
 const fileList = document.getElementById('fileList');
@@ -201,58 +208,22 @@ function removeStoredValue(key) {
   }
 }
 
-async function getUsersRows() {
-  const callbackName = `portalAuthCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const script = document.createElement('script');
-  const url = new URL(USERS_SHEET_URL);
-  url.searchParams.set('tqx', `out:json;responseHandler:${callbackName}`);
-  url.searchParams.set('_', Date.now().toString());
-
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      delete window[callbackName];
-      script.remove();
-    };
-
-    window[callbackName] = (payload) => {
-      cleanup();
-      if (payload.status !== 'ok') {
-        reject(new Error('Не удалось загрузить список пользователей.'));
-        return;
-      }
-
-      const rows = (payload.table?.rows || []).map((row) =>
-        (row.c || []).map((cell) => String(cell?.f ?? cell?.v ?? '').trim())
-      );
-      resolve(rows);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('Не удалось подключиться к Google Таблице.'));
-    };
-    script.src = url.toString();
-    document.head.appendChild(script);
-  });
-}
-
-function findUserByLogin(rows, login) {
-  const normalizedLogin = normalizeText(login);
-  return rows.find((row) => normalizeText(row[0]) === normalizedLogin);
-}
-
-async function validateLogin(login) {
-  const user = findUserByLogin(await getUsersRows(), login);
-  if (!user) return { allowed: false, message: 'Логин не найден.' };
-  if (normalizeText(user[2]).includes('уволен')) {
-    return { allowed: false, message: 'Доступ запрещен: пользователь отмечен как уволенный.' };
-  }
-  return { allowed: true };
-}
-
 function setAuthMessage(message, isError = false) {
   authMessage.textContent = message;
   authMessage.classList.toggle('auth-message--error', isError);
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const isRegister = mode === 'register';
+  authTitle.textContent = isRegister ? 'Регистрация' : 'Вход в портал';
+  authSubmit.textContent = isRegister ? 'Зарегистрироваться' : 'Войти';
+  loginModeButton.setAttribute('aria-pressed', String(!isRegister));
+  registerModeButton.setAttribute('aria-pressed', String(isRegister));
+  confirmPasswordField.hidden = !isRegister;
+  passwordInput.autocomplete = isRegister ? 'new-password' : 'current-password';
+  confirmPasswordInput.required = isRegister;
+  setAuthMessage('');
 }
 
 function unlockPortal(login) {
@@ -261,25 +232,97 @@ function unlockPortal(login) {
   loadDocuments();
 }
 
-async function handleAuthSubmit(event) {
-  event.preventDefault();
-  const login = loginInput.value.trim();
+async function callAuthApi(action, payload) {
+  if (!authEndpoint) {
+    throw new Error('Авторизация еще не настроена: укажите authEndpoint в app.json.');
+  }
+
+  const callbackName = `portalAuthApi_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const script = document.createElement('script');
+  const url = new URL(authEndpoint);
+  url.searchParams.set('action', action);
+  url.searchParams.set('login', payload.login);
+  url.searchParams.set('password', payload.password);
+  url.searchParams.set('callback', callbackName);
+  url.searchParams.set('_', Date.now().toString());
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Сервер авторизации не ответил. Проверьте доступ Apps Script: веб-приложение должно быть доступно всем, у кого есть ссылка.'));
+    }, 15000);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove();
+    };
+
+    window[callbackName] = (result) => {
+      cleanup();
+      if (!result || typeof result !== 'object') {
+        reject(new Error('Некорректный ответ сервера авторизации.'));
+        return;
+      }
+      resolve(result);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Не удалось подключиться к серверу авторизации.'));
+    };
+
+    script.src = url.toString();
+    document.head.appendChild(script);
+  });
+}
+
+function validateAuthFields(login, password) {
   if (!login) {
     setAuthMessage('Введите логин.', true);
     loginInput.focus();
-    return;
+    return false;
   }
+  if (!password) {
+    setAuthMessage('Введите пароль.', true);
+    passwordInput.focus();
+    return false;
+  }
+  if (authMode === 'register' && password.length < 6) {
+    setAuthMessage('Пароль должен быть не короче 6 символов.', true);
+    passwordInput.focus();
+    return false;
+  }
+  if (authMode === 'register' && password !== confirmPasswordInput.value) {
+    setAuthMessage('Пароли не совпадают.', true);
+    confirmPasswordInput.focus();
+    return false;
+  }
+  return true;
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const login = loginInput.value.trim();
+  const password = passwordInput.value;
+  if (!validateAuthFields(login, password)) return;
 
   authSubmit.disabled = true;
-  setAuthMessage('Проверяем доступ...');
+  setAuthMessage(authMode === 'register' ? 'Регистрируем пароль...' : 'Проверяем доступ...');
   try {
-    const result = await validateLogin(login);
+    const result = await callAuthApi(authMode, { login, password });
     if (result.allowed) {
+      passwordInput.value = '';
+      confirmPasswordInput.value = '';
       unlockPortal(login);
+    } else if (result.needsRegistration) {
+      setAuthMode('register');
+      setAuthMessage(result.message || 'Для этого логина нужно сначала задать пароль.', true);
+      passwordInput.focus();
     } else {
-      setAuthMessage(result.message, true);
+      setAuthMessage(result.message || 'Доступ запрещен.', true);
       removeStoredValue(AUTH_LOGIN_KEY);
-      loginInput.focus();
+      passwordInput.focus();
     }
   } catch (error) {
     setAuthMessage(error.message || 'Не удалось проверить доступ.', true);
@@ -292,28 +335,24 @@ async function initializeAuth() {
   const storedLogin = readStoredValue(AUTH_LOGIN_KEY) || '';
   loginInput.value = storedLogin;
   authForm.addEventListener('submit', handleAuthSubmit);
+  loginModeButton.addEventListener('click', () => setAuthMode('login'));
+  registerModeButton.addEventListener('click', () => setAuthMode('register'));
+
+  try {
+    const response = await fetch('app.json', { cache: 'no-cache' });
+    const appConfig = response.ok ? await response.json() : {};
+    authEndpoint = String(appConfig.authEndpoint || '').trim();
+  } catch {
+    authEndpoint = '';
+  }
 
   if (!storedLogin) {
     loginInput.focus();
     return;
   }
 
-  authSubmit.disabled = true;
-  setAuthMessage('Проверяем сохраненный логин...');
-  try {
-    const result = await validateLogin(storedLogin);
-    if (result.allowed) {
-      unlockPortal(storedLogin);
-    } else {
-      setAuthMessage(result.message, true);
-      removeStoredValue(AUTH_LOGIN_KEY);
-      loginInput.focus();
-    }
-  } catch (error) {
-    setAuthMessage(error.message || 'Не удалось проверить доступ.', true);
-  } finally {
-    authSubmit.disabled = false;
-  }
+  setAuthMessage('Введите пароль для сохраненного логина.');
+  passwordInput.focus();
 }
 
 function isNewDocument(file) {

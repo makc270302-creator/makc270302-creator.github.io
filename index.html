@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://docs.google.com; connect-src 'self' https://docs.google.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://script.google.com https://script.googleusercontent.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="referrer" content="same-origin" />
   <meta name="theme-color" content="#991b1b" />
   <title>База PDF-инструкций</title>
@@ -15,9 +15,21 @@
     <form id="authForm" class="auth-panel" autocomplete="off">
       <p class="eyebrow">Внутренний доступ</p>
       <h1 id="authTitle">Вход в портал</h1>
+      <div class="auth-mode" role="group" aria-label="Режим авторизации">
+        <button id="loginModeButton" type="button" aria-pressed="true">Вход</button>
+        <button id="registerModeButton" type="button" aria-pressed="false">Регистрация</button>
+      </div>
       <label class="auth-field">
         <span>Логин</span>
         <input id="loginInput" type="text" inputmode="text" autocomplete="username" required />
+      </label>
+      <label class="auth-field">
+        <span>Пароль</span>
+        <input id="passwordInput" type="password" autocomplete="current-password" required />
+      </label>
+      <label id="confirmPasswordField" class="auth-field" hidden>
+        <span>Повторите пароль</span>
+        <input id="confirmPasswordInput" type="password" autocomplete="new-password" />
       </label>
       <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
       <button id="authSubmit" type="submit">Войти</button>
@@ -28,7 +40,7 @@
     <div class="hero__content">
       <div>
         <p class="eyebrow">Внутренняя база документов ООО "Разгуляй"</p>
-        <h1>PDF-инструкции v <span id="portalVersion">2.4.0</span></h1>
+        <h1>PDF-инструкции v <span id="portalVersion">2.5.0</span></h1>
         <p class="hero__text">Корпоративная база знаний: поиск, категории, версии документов, история изменений и просмотр PDF прямо на сайте.</p>
       </div>
       <div class="hero__actions">
