@@ -15,6 +15,8 @@ const VIEW_KEY = 'pdf-portal-view';
 const FILTERS_KEY = 'pdf-portal-filters';
 const RECENT_KEY = 'pdf-portal-recent';
 const VIEWS_KEY = 'pdf-portal-document-views';
+const AUTH_LOGIN_KEY = 'pdf-portal-login';
+const USERS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ppTZqoJTEvqy5m0LEkm0gpZNJKU_taTGX6ZWBwb8-xk/gviz/tq?sheet=%D0%9F%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D0%B8';
 const FILES_PAGE_SIZE = 12;
 const CHANGELOG_PAGE_SIZE = 10;
 let favorites = new Set(readStoredArray(FAVORITES_KEY));
@@ -25,6 +27,10 @@ const storedFilters = readStoredObject(FILTERS_KEY);
 let visibleFilesCount = FILES_PAGE_SIZE;
 let visibleChangelogCount = CHANGELOG_PAGE_SIZE;
 
+const authForm = document.getElementById('authForm');
+const loginInput = document.getElementById('loginInput');
+const authMessage = document.getElementById('authMessage');
+const authSubmit = document.getElementById('authSubmit');
 const fileList = document.getElementById('fileList');
 const popularList = document.getElementById('popularList');
 const popularSection = document.getElementById('popularSection');
@@ -184,6 +190,129 @@ function storeValue(key, value) {
     localStorage.setItem(key, value);
   } catch {
     // Настройки останутся активны до перезагрузки страницы.
+  }
+}
+
+function removeStoredValue(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Browser storage can be restricted.
+  }
+}
+
+async function getUsersRows() {
+  const callbackName = `portalAuthCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const script = document.createElement('script');
+  const url = new URL(USERS_SHEET_URL);
+  url.searchParams.set('tqx', `out:json;responseHandler:${callbackName}`);
+  url.searchParams.set('_', Date.now().toString());
+
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+
+    window[callbackName] = (payload) => {
+      cleanup();
+      if (payload.status !== 'ok') {
+        reject(new Error('Не удалось загрузить список пользователей.'));
+        return;
+      }
+
+      const rows = (payload.table?.rows || []).map((row) =>
+        (row.c || []).map((cell) => String(cell?.f ?? cell?.v ?? '').trim())
+      );
+      resolve(rows);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Не удалось подключиться к Google Таблице.'));
+    };
+    script.src = url.toString();
+    document.head.appendChild(script);
+  });
+}
+
+function findUserByLogin(rows, login) {
+  const normalizedLogin = normalizeText(login);
+  return rows.find((row) => normalizeText(row[0]) === normalizedLogin);
+}
+
+async function validateLogin(login) {
+  const user = findUserByLogin(await getUsersRows(), login);
+  if (!user) return { allowed: false, message: 'Логин не найден.' };
+  if (normalizeText(user[2]).includes('уволен')) {
+    return { allowed: false, message: 'Доступ запрещен: пользователь отмечен как уволенный.' };
+  }
+  return { allowed: true };
+}
+
+function setAuthMessage(message, isError = false) {
+  authMessage.textContent = message;
+  authMessage.classList.toggle('auth-message--error', isError);
+}
+
+function unlockPortal(login) {
+  storeValue(AUTH_LOGIN_KEY, login);
+  document.body.classList.remove('auth-pending');
+  loadDocuments();
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const login = loginInput.value.trim();
+  if (!login) {
+    setAuthMessage('Введите логин.', true);
+    loginInput.focus();
+    return;
+  }
+
+  authSubmit.disabled = true;
+  setAuthMessage('Проверяем доступ...');
+  try {
+    const result = await validateLogin(login);
+    if (result.allowed) {
+      unlockPortal(login);
+    } else {
+      setAuthMessage(result.message, true);
+      removeStoredValue(AUTH_LOGIN_KEY);
+      loginInput.focus();
+    }
+  } catch (error) {
+    setAuthMessage(error.message || 'Не удалось проверить доступ.', true);
+  } finally {
+    authSubmit.disabled = false;
+  }
+}
+
+async function initializeAuth() {
+  const storedLogin = readStoredValue(AUTH_LOGIN_KEY) || '';
+  loginInput.value = storedLogin;
+  authForm.addEventListener('submit', handleAuthSubmit);
+
+  if (!storedLogin) {
+    loginInput.focus();
+    return;
+  }
+
+  authSubmit.disabled = true;
+  setAuthMessage('Проверяем сохраненный логин...');
+  try {
+    const result = await validateLogin(storedLogin);
+    if (result.allowed) {
+      unlockPortal(storedLogin);
+    } else {
+      setAuthMessage(result.message, true);
+      removeStoredValue(AUTH_LOGIN_KEY);
+      loginInput.focus();
+    }
+  } catch (error) {
+    setAuthMessage(error.message || 'Не удалось проверить доступ.', true);
+  } finally {
+    authSubmit.disabled = false;
   }
 }
 
@@ -646,4 +775,4 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-loadDocuments();
+initializeAuth();

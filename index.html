@@ -3,20 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://docs.google.com; connect-src 'self' https://docs.google.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="referrer" content="same-origin" />
   <meta name="theme-color" content="#991b1b" />
   <title>База PDF-инструкций</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
-<body>
+<body class="auth-pending">
+  <section id="authScreen" class="auth-screen" aria-labelledby="authTitle">
+    <form id="authForm" class="auth-panel" autocomplete="off">
+      <p class="eyebrow">Внутренний доступ</p>
+      <h1 id="authTitle">Вход в портал</h1>
+      <label class="auth-field">
+        <span>Логин</span>
+        <input id="loginInput" type="text" inputmode="text" autocomplete="username" required />
+      </label>
+      <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
+      <button id="authSubmit" type="submit">Войти</button>
+    </form>
+  </section>
   <a class="skip-link" href="#mainContent">Перейти к документам</a>
   <header class="hero">
     <div class="hero__content">
       <div>
         <p class="eyebrow">Внутренняя база документов ООО "Разгуляй"</p>
-        <h1>PDF-инструкции v <span id="portalVersion">2.3.3</span></h1>
+        <h1>PDF-инструкции v <span id="portalVersion">2.4.0</span></h1>
         <p class="hero__text">Корпоративная база знаний: поиск, категории, версии документов, история изменений и просмотр PDF прямо на сайте.</p>
       </div>
       <div class="hero__actions">

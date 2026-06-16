@@ -44,6 +44,85 @@ body {
   overflow-x: hidden;
 }
 
+body.auth-pending .skip-link,
+body.auth-pending .hero,
+body.auth-pending .container,
+body.auth-pending footer {
+  display: none;
+}
+
+body:not(.auth-pending) .auth-screen {
+  display: none;
+}
+
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(119, 19, 19, 0.92), rgba(198, 39, 25, 0.9)),
+    var(--bg);
+}
+
+.auth-panel {
+  width: min(100%, 430px);
+  display: grid;
+  gap: 18px;
+  padding: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 18px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.auth-panel .eyebrow {
+  color: var(--red);
+  opacity: 1;
+}
+
+.auth-panel h1 {
+  font-size: 34px;
+  color: var(--text);
+}
+
+.auth-field {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.auth-field input {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 18px;
+}
+
+.auth-message {
+  min-height: 22px;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-message--error {
+  color: var(--red);
+}
+
+.auth-panel button {
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--red);
+  color: white;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 a,
 button,
 input,

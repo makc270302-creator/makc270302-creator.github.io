@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pdf-portal-v2.3.1';
+const CACHE_NAME = 'pdf-portal-v2.3.4';
 const CORE_FILES = [
   './',
   './index.html',
@@ -27,6 +27,10 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (new URL(event.request.url).origin !== self.location.origin) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((response) => {
