@@ -112,6 +112,12 @@ body:not(.auth-pending) .auth-screen {
   color: white;
 }
 
+body.auth-checking .auth-mode,
+body.auth-checking .auth-field,
+body.auth-checking .auth-panel > button {
+  display: none;
+}
+
 .auth-field {
   display: grid;
   gap: 8px;

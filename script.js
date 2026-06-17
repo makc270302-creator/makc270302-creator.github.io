@@ -364,6 +364,8 @@ async function initializeAuth() {
 
   const storedAuthToken = getStoredAuthToken();
   if (storedLogin && getStoredAuthLogin() === storedLogin && storedAuthToken) {
+    document.body.classList.add('auth-checking');
+    authTitle.textContent = 'Проверяем доступ';
     setAuthMessage('Проверяем доступ...');
     authSubmit.disabled = true;
     try {
@@ -378,6 +380,8 @@ async function initializeAuth() {
     } catch (error) {
       setAuthMessage(error.message || 'Не удалось проверить доступ.', true);
     } finally {
+      document.body.classList.remove('auth-checking');
+      authTitle.textContent = 'Вход в портал';
       authSubmit.disabled = false;
     }
     passwordInput.focus();
