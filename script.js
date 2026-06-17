@@ -16,6 +16,7 @@ const FILTERS_KEY = 'pdf-portal-filters';
 const RECENT_KEY = 'pdf-portal-recent';
 const VIEWS_KEY = 'pdf-portal-document-views';
 const AUTH_LOGIN_KEY = 'pdf-portal-login';
+const AUTH_SESSION_KEY = 'pdf-portal-auth-session';
 const FILES_PAGE_SIZE = 12;
 const CHANGELOG_PAGE_SIZE = 10;
 let authEndpoint = '';
@@ -208,6 +209,11 @@ function removeStoredValue(key) {
   }
 }
 
+function getStoredAuthLogin() {
+  const session = readStoredObject(AUTH_SESSION_KEY);
+  return typeof session.login === 'string' ? session.login : '';
+}
+
 function setAuthMessage(message, isError = false) {
   authMessage.textContent = message;
   authMessage.classList.toggle('auth-message--error', isError);
@@ -228,6 +234,7 @@ function setAuthMode(mode) {
 
 function unlockPortal(login) {
   storeValue(AUTH_LOGIN_KEY, login);
+  storeValue(AUTH_SESSION_KEY, JSON.stringify({ login }));
   document.body.classList.remove('auth-pending');
   loadDocuments();
 }
@@ -322,6 +329,7 @@ async function handleAuthSubmit(event) {
     } else {
       setAuthMessage(result.message || 'Доступ запрещен.', true);
       removeStoredValue(AUTH_LOGIN_KEY);
+      removeStoredValue(AUTH_SESSION_KEY);
       passwordInput.focus();
     }
   } catch (error) {
@@ -337,6 +345,11 @@ async function initializeAuth() {
   authForm.addEventListener('submit', handleAuthSubmit);
   loginModeButton.addEventListener('click', () => setAuthMode('login'));
   registerModeButton.addEventListener('click', () => setAuthMode('register'));
+
+  if (storedLogin && getStoredAuthLogin() === storedLogin) {
+    unlockPortal(storedLogin);
+    return;
+  }
 
   try {
     const response = await fetch('app.json', { cache: 'no-cache' });
