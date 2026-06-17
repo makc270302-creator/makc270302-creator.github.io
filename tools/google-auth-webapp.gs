@@ -30,9 +30,10 @@ function handleAuthPayload(payload) {
     const action = String(payload.action || '').trim();
     const login = String(payload.login || '').trim();
     const password = String(payload.password || '');
+    const sessionToken = String(payload.sessionToken || '');
 
-    if (!login || !password) return { allowed: false, message: 'Введите логин и пароль.' };
-    if (action !== 'login' && action !== 'register') return { allowed: false, message: 'Неизвестное действие.' };
+    if (!login) return { allowed: false, message: 'Введите логин.' };
+    if (action !== 'login' && action !== 'register' && action !== 'status') return { allowed: false, message: 'Неизвестное действие.' };
 
     const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(USERS_SHEET_NAME);
     if (!sheet) return { allowed: false, message: 'Лист пользователей не найден.' };
@@ -46,11 +47,21 @@ function handleAuthPayload(payload) {
     const passwordCell = sheet.getRange(rowInfo.rowNumber, PASSWORD_COLUMN);
     const storedPassword = String(passwordCell.getDisplayValue() || '').trim();
 
+    if (action === 'status') {
+      if (storedPassword && sessionToken === createSessionToken(login, storedPassword)) {
+        return { allowed: true };
+      }
+      return { allowed: false, message: 'Сессия устарела. Войдите снова.' };
+    }
+
+    if (!password) return { allowed: false, message: 'Введите пароль.' };
+
     if (action === 'register') {
       if (password.length < 6) return { allowed: false, message: 'Пароль должен быть не короче 6 символов.' };
       if (storedPassword) return { allowed: false, message: 'Для этого логина пароль уже задан.' };
-      passwordCell.setValue(hashPassword(login, password));
-      return { allowed: true };
+      const passwordHash = hashPassword(login, password);
+      passwordCell.setValue(passwordHash);
+      return { allowed: true, sessionToken: createSessionToken(login, passwordHash) };
     }
 
     if (!storedPassword) {
@@ -65,7 +76,7 @@ function handleAuthPayload(payload) {
       return { allowed: false, message: 'Неверный логин или пароль.' };
     }
 
-    return { allowed: true };
+    return { allowed: true, sessionToken: createSessionToken(login, storedPassword) };
   } catch (error) {
     return { allowed: false, message: error.message || 'Ошибка авторизации.' };
   }
@@ -101,6 +112,19 @@ function hashPassword(login, password) {
     return value.toString(16).padStart(2, '0');
   }).join('');
   return `sha256$${hash}`;
+}
+
+function createSessionToken(login, storedPassword) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    `${normalizeLogin(login)}:${storedPassword}:portal-session-v1`,
+    Utilities.Charset.UTF_8
+  );
+  const hash = bytes.map((byte) => {
+    const value = byte < 0 ? byte + 256 : byte;
+    return value.toString(16).padStart(2, '0');
+  }).join('');
+  return `session$${hash}`;
 }
 
 function isSafeCallbackName(callback) {

@@ -214,6 +214,11 @@ function getStoredAuthLogin() {
   return typeof session.login === 'string' ? session.login : '';
 }
 
+function getStoredAuthToken() {
+  const session = readStoredObject(AUTH_SESSION_KEY);
+  return typeof session.token === 'string' ? session.token : '';
+}
+
 function setAuthMessage(message, isError = false) {
   authMessage.textContent = message;
   authMessage.classList.toggle('auth-message--error', isError);
@@ -232,9 +237,11 @@ function setAuthMode(mode) {
   setAuthMessage('');
 }
 
-function unlockPortal(login) {
+function unlockPortal(login, token = '') {
   storeValue(AUTH_LOGIN_KEY, login);
-  storeValue(AUTH_SESSION_KEY, JSON.stringify({ login }));
+  if (token) {
+    storeValue(AUTH_SESSION_KEY, JSON.stringify({ login, token }));
+  }
   document.body.classList.remove('auth-pending');
   loadDocuments();
 }
@@ -249,7 +256,8 @@ async function callAuthApi(action, payload) {
   const url = new URL(authEndpoint);
   url.searchParams.set('action', action);
   url.searchParams.set('login', payload.login);
-  url.searchParams.set('password', payload.password);
+  url.searchParams.set('password', payload.password || '');
+  url.searchParams.set('sessionToken', payload.sessionToken || '');
   url.searchParams.set('callback', callbackName);
   url.searchParams.set('_', Date.now().toString());
 
@@ -321,7 +329,7 @@ async function handleAuthSubmit(event) {
     if (result.allowed) {
       passwordInput.value = '';
       confirmPasswordInput.value = '';
-      unlockPortal(login);
+      unlockPortal(login, result.sessionToken || '');
     } else if (result.needsRegistration) {
       setAuthMode('register');
       setAuthMessage(result.message || 'Для этого логина нужно сначала задать пароль.', true);
@@ -346,17 +354,34 @@ async function initializeAuth() {
   loginModeButton.addEventListener('click', () => setAuthMode('login'));
   registerModeButton.addEventListener('click', () => setAuthMode('register'));
 
-  if (storedLogin && getStoredAuthLogin() === storedLogin) {
-    unlockPortal(storedLogin);
-    return;
-  }
-
   try {
     const response = await fetch('app.json', { cache: 'no-cache' });
     const appConfig = response.ok ? await response.json() : {};
     authEndpoint = String(appConfig.authEndpoint || '').trim();
   } catch {
     authEndpoint = '';
+  }
+
+  const storedAuthToken = getStoredAuthToken();
+  if (storedLogin && getStoredAuthLogin() === storedLogin && storedAuthToken) {
+    setAuthMessage('Проверяем доступ...');
+    authSubmit.disabled = true;
+    try {
+      const result = await callAuthApi('status', { login: storedLogin, sessionToken: storedAuthToken });
+      if (result.allowed) {
+        unlockPortal(storedLogin, storedAuthToken);
+        return;
+      }
+      removeStoredValue(AUTH_LOGIN_KEY);
+      removeStoredValue(AUTH_SESSION_KEY);
+      setAuthMessage(result.message || 'Доступ запрещен.', true);
+    } catch (error) {
+      setAuthMessage(error.message || 'Не удалось проверить доступ.', true);
+    } finally {
+      authSubmit.disabled = false;
+    }
+    passwordInput.focus();
+    return;
   }
 
   if (!storedLogin) {
