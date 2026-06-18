@@ -45,9 +45,14 @@ export function sortDocuments(documents) {
   );
 }
 
+function getDocumentUpdateTime(file) {
+  return parseDate(file?.updatedDate)?.getTime()
+    ?? parseDate(file?.uploadDate)?.getTime()
+    ?? 0;
+}
+
 export function sortByDateDescending(a, b) {
-  return (parseDate(b.updatedDate || b.uploadDate)?.getTime() || 0)
-    - (parseDate(a.updatedDate || a.uploadDate)?.getTime() || 0);
+  return getDocumentUpdateTime(b) - getDocumentUpdateTime(a);
 }
 
 export function sanitizeFileName(name) {

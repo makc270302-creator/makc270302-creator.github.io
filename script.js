@@ -499,8 +499,10 @@ function getFilteredFiles() {
 
   return filtered.sort((a, b) => {
     if (sortFilter.value === 'title-desc') return String(b.title).localeCompare(String(a.title), 'ru');
-    if (sortFilter.value === 'date-desc') return sortByDateDescending(a, b);
-    if (sortFilter.value === 'date-asc') return sortByDateDescending(b, a);
+    if (sortFilter.value === 'date-desc') return sortByDateDescending(a, b)
+      || String(a.title).localeCompare(String(b.title), 'ru');
+    if (sortFilter.value === 'date-asc') return sortByDateDescending(b, a)
+      || String(a.title).localeCompare(String(b.title), 'ru');
     if (sortFilter.value === 'popular') return Number(Boolean(b.popular)) - Number(Boolean(a.popular))
       || String(a.title).localeCompare(String(b.title), 'ru');
     return String(a.title).localeCompare(String(b.title), 'ru');
