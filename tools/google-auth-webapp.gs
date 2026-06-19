@@ -59,9 +59,8 @@ function handleAuthPayload(payload) {
     if (action === 'register') {
       if (password.length < 6) return { allowed: false, message: 'Пароль должен быть не короче 6 символов.' };
       if (storedPassword) return { allowed: false, message: 'Для этого логина пароль уже задан.' };
-      const passwordHash = hashPassword(login, password);
-      passwordCell.setValue(passwordHash);
-      return { allowed: true, sessionToken: createSessionToken(login, passwordHash) };
+      passwordCell.setValue(password);
+      return { allowed: true, sessionToken: createSessionToken(login, password) };
     }
 
     if (!storedPassword) {
@@ -72,11 +71,15 @@ function handleAuthPayload(payload) {
       };
     }
 
-    if (storedPassword !== hashPassword(login, password)) {
+    if (!isPasswordValid(login, password, storedPassword)) {
       return { allowed: false, message: 'Неверный логин или пароль.' };
     }
 
-    return { allowed: true, sessionToken: createSessionToken(login, storedPassword) };
+    if (isLegacyPasswordHash(storedPassword)) {
+      passwordCell.setValue(password);
+    }
+
+    return { allowed: true, sessionToken: createSessionToken(login, password) };
   } catch (error) {
     return { allowed: false, message: error.message || 'Ошибка авторизации.' };
   }
@@ -99,6 +102,15 @@ function findUserRow(sheet, login) {
 
 function normalizeLogin(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function isPasswordValid(login, password, storedPassword) {
+  if (storedPassword === password) return true;
+  return isLegacyPasswordHash(storedPassword) && storedPassword === hashPassword(login, password);
+}
+
+function isLegacyPasswordHash(storedPassword) {
+  return String(storedPassword || '').startsWith('sha256$');
 }
 
 function hashPassword(login, password) {
