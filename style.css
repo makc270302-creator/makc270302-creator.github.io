@@ -212,6 +212,24 @@ button:disabled,
 
 h1 { margin: 0; font-size: clamp(34px, 6vw, 64px); overflow-wrap: anywhere; word-break: break-word; }
 
+.hero__title-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 24px);
+  perspective: 700px;
+}
+
+.hero__coin {
+  width: clamp(52px, 7vw, 84px);
+  height: clamp(52px, 7vw, 84px);
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 50%;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.24));
+  transform-style: preserve-3d;
+  animation: coin-spin 2.8s linear infinite;
+}
+
 .hero__text {
   max-width: 760px;
   font-size: 18px;
@@ -900,6 +918,14 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
   to { opacity: 1; transform: rotate(0) scale(1); }
 }
 
+@keyframes coin-spin {
+  0% { transform: rotateY(0deg); filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.24)) brightness(1); }
+  25% { filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.18)) brightness(0.82); }
+  50% { transform: rotateY(180deg); filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.24)) brightness(1); }
+  75% { filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.18)) brightness(1.12); }
+  100% { transform: rotateY(360deg); filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.24)) brightness(1); }
+}
+
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }
   .viewer-panel { position: static; }
@@ -913,6 +939,7 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
   .recent-list,
   .file-grid { grid-template-columns: 1fr; display: grid; }
   .hero__badge { display: none; }
+  .hero__title-row { align-items: flex-start; }
   .section-title { display: block; }
   .actions--three { grid-template-columns: 1fr; }
   .viewer-actions--three { grid-template-columns: 1fr; }
