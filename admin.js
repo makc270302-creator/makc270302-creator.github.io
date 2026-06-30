@@ -36,6 +36,8 @@ const statusBox = document.getElementById('statusBox');
 const loadDocumentsButton = document.getElementById('loadDocumentsButton');
 const manageList = document.getElementById('manageList');
 const manageStatusBox = document.getElementById('manageStatusBox');
+const manageSearch = document.getElementById('manageSearch');
+const manageSearchResult = document.getElementById('manageSearchResult');
 const selectAllDocuments = document.getElementById('selectAllDocuments');
 const bulkCategory = document.getElementById('bulkCategory');
 const applyBulkCategoryButton = document.getElementById('applyBulkCategoryButton');
@@ -218,15 +220,52 @@ function validateEditForm() {
   return validatePdf(editPdfFile.files[0]);
 }
 
+function getVisibleDocuments() {
+  const terms = normalizeText(manageSearch.value).split(/\s+/).filter(Boolean);
+  if (!terms.length) return cachedDocuments;
+
+  return cachedDocuments.filter((documentItem) => {
+    const searchableText = normalizeText([
+      documentItem.title,
+      documentItem.description,
+      documentItem.category,
+      documentItem.author,
+      documentItem.path
+    ].filter(Boolean).join(' '));
+    return terms.every((term) => searchableText.includes(term));
+  });
+}
+
+function updateVisibleSelectionState(visibleDocuments) {
+  const visiblePaths = visibleDocuments.map((item) => item.path);
+  const selectedVisibleCount = visiblePaths.filter((path) => selectedDocumentPaths.has(path)).length;
+  selectAllDocuments.checked = visiblePaths.length > 0 && selectedVisibleCount === visiblePaths.length;
+  selectAllDocuments.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visiblePaths.length;
+}
+
 function renderManageList() {
   manageList.replaceChildren();
 
   if (!cachedDocuments.length) {
     appendTextElement(manageList, 'p', 'Документы не загружены.', 'muted-text');
+    manageSearchResult.textContent = '';
+    updateVisibleSelectionState([]);
     return;
   }
 
-  for (const documentItem of cachedDocuments) {
+  const visibleDocuments = getVisibleDocuments();
+  const hasSearch = Boolean(manageSearch.value.trim());
+  manageSearchResult.textContent = hasSearch
+    ? `Найдено: ${visibleDocuments.length} из ${cachedDocuments.length}`
+    : `Всего документов: ${cachedDocuments.length}`;
+  updateVisibleSelectionState(visibleDocuments);
+
+  if (!visibleDocuments.length) {
+    appendTextElement(manageList, 'p', 'По вашему запросу документы не найдены.', 'muted-text');
+    return;
+  }
+
+  for (const documentItem of visibleDocuments) {
     const item = document.createElement('article');
     item.className = 'manage-item manage-item--document';
     const selection = document.createElement('input');
@@ -434,14 +473,19 @@ manageList.addEventListener('change', (event) => {
   if (!checkbox) return;
   if (checkbox.checked) selectedDocumentPaths.add(checkbox.dataset.selectPath);
   else selectedDocumentPaths.delete(checkbox.dataset.selectPath);
-  selectAllDocuments.checked = selectedDocumentPaths.size === cachedDocuments.length && cachedDocuments.length > 0;
+  updateVisibleSelectionState(getVisibleDocuments());
 });
 
 selectAllDocuments.addEventListener('change', () => {
-  selectedDocumentPaths.clear();
-  if (selectAllDocuments.checked) cachedDocuments.forEach((item) => selectedDocumentPaths.add(item.path));
+  const visibleDocuments = getVisibleDocuments();
+  visibleDocuments.forEach((item) => {
+    if (selectAllDocuments.checked) selectedDocumentPaths.add(item.path);
+    else selectedDocumentPaths.delete(item.path);
+  });
   renderManageList();
 });
+
+manageSearch.addEventListener('input', renderManageList);
 
 applyBulkCategoryButton.addEventListener('click', async () => {
   if (!bulkCategory.value) return showStatus(manageStatusBox, 'Выберите категорию.', 'error');

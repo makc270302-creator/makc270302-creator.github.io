@@ -81,12 +81,22 @@
       <div class="admin-section-title">
         <div>
           <h2>🗂️ Редактирование и удаление</h2>
-          <p>Загрузите список документов, затем выберите нужную карточку.</p>
+          <p>Загрузите список документов, затем найдите нужную карточку.</p>
         </div>
         <button id="loadDocumentsButton" type="button">Обновить список</button>
       </div>
+      <div class="manage-search">
+        <label for="manageSearch">Поиск документов</label>
+        <input
+          id="manageSearch"
+          type="search"
+          placeholder="Название, категория, автор или описание..."
+          autocomplete="off"
+        />
+        <span id="manageSearchResult" class="manage-search__result" aria-live="polite"></span>
+      </div>
       <div class="bulk-toolbar">
-        <label class="checkbox-row"><input id="selectAllDocuments" type="checkbox" /> Выбрать все</label>
+        <label class="checkbox-row"><input id="selectAllDocuments" type="checkbox" /> Выбрать все найденные</label>
         <select id="bulkCategory" aria-label="Категория для выбранных документов">
           <option value="">Сменить категорию...</option>
         </select>

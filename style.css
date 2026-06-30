@@ -1002,6 +1002,24 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
   gap: 10px;
   align-items: center;
 }
+.manage-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 14px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+.manage-search label {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.manage-search input { margin: 0; }
+.manage-search__result {
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+  padding-bottom: 12px;
+}
 .bulk-toolbar button {
   border: 0;
   border-radius: 12px;
@@ -1096,6 +1114,8 @@ footer { text-align: center; color: var(--muted); padding: 20px; }
     display: grid;
   }
   .bulk-toolbar { grid-template-columns: 1fr; }
+  .manage-search { grid-template-columns: 1fr; }
+  .manage-search__result { padding-bottom: 0; }
 
   .manage-actions,
   .admin-form-actions {
