@@ -980,5 +980,7 @@ aiQuestion.addEventListener('keydown', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js?v=2.5.4', { updateViaCache: 'none' }).catch(() => {});
+}
 initializeAuth();
