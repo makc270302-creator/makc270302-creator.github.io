@@ -5,6 +5,11 @@ const POSITION_COLUMN = 3;
 const PASSWORD_COLUMN = 6;
 const AI_WORKER_URL = 'https://pdf-portal-ai.makc270302.workers.dev/ask';
 
+function authorizeAiProxy() {
+  const response = UrlFetchApp.fetch(AI_WORKER_URL.replace('/ask', '/health'));
+  Logger.log(response.getContentText());
+}
+
 function doPost(event) {
   try {
     const payload = JSON.parse(event.postData.contents || '{}');
