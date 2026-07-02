@@ -66,7 +66,8 @@ function uniqueSources(matches) {
 async function handleAsk(request, env) {
   const headers = corsHeaders(request, env);
   const origin = request.headers.get('Origin') || '';
-  if (!allowedOrigins(env).includes(origin)) {
+  const isTrustedProxy = request.headers.get('X-Portal-Proxy') === 'google-apps-script';
+  if (!isTrustedProxy && !allowedOrigins(env).includes(origin)) {
     return json({ error: 'Источник запроса не разрешён.' }, 403, headers);
   }
 

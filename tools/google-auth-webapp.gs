@@ -3,6 +3,7 @@ const USERS_SHEET_NAME = 'Пользователи';
 const LOGIN_COLUMN = 1;
 const POSITION_COLUMN = 3;
 const PASSWORD_COLUMN = 6;
+const AI_WORKER_URL = 'https://pdf-portal-ai.makc270302.workers.dev/ask';
 
 function doPost(event) {
   try {
@@ -16,13 +17,47 @@ function doPost(event) {
 function doGet(event) {
   const payload = event.parameter || {};
   const callback = String(payload.callback || '').trim();
-  const result = handleAuthPayload(payload);
+  const result = String(payload.action || '') === 'ai'
+    ? handleAiPayload(payload)
+    : handleAuthPayload(payload);
 
   if (isSafeCallbackName(callback)) {
     return javascriptResponse(`${callback}(${JSON.stringify(result)});`);
   }
 
   return jsonResponse(result);
+}
+
+function handleAiPayload(payload) {
+  try {
+    const question = String(payload.question || '').trim();
+    if (!question) return { error: 'Введите вопрос.' };
+    if (question.length > 1200) return { error: 'Вопрос должен быть короче 1200 символов.' };
+
+    const session = handleAuthPayload({
+      action: 'status',
+      login: payload.login,
+      sessionToken: payload.sessionToken
+    });
+    if (!session.allowed) {
+      return { error: session.message || 'Сессия устарела. Войдите снова.' };
+    }
+
+    const response = UrlFetchApp.fetch(AI_WORKER_URL, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'X-Portal-Proxy': 'google-apps-script' },
+      payload: JSON.stringify({ question }),
+      muteHttpExceptions: true
+    });
+    const result = JSON.parse(response.getContentText() || '{}');
+    if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
+      return { error: result.error || 'Сервис поиска временно недоступен.' };
+    }
+    return result;
+  } catch (error) {
+    return { error: error.message || 'Не удалось получить ответ.' };
+  }
 }
 
 function handleAuthPayload(payload) {

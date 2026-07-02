@@ -20,6 +20,7 @@ const AUTH_SESSION_KEY = 'pdf-portal-auth-session';
 const FILES_PAGE_SIZE = 12;
 const CHANGELOG_PAGE_SIZE = 10;
 let authEndpoint = '';
+let aiProxyEndpoint = '';
 let authMode = 'login';
 let favorites = new Set(readStoredArray(FAVORITES_KEY));
 let recentPaths = readStoredArray(RECENT_KEY);
@@ -298,13 +299,23 @@ async function askAiAssistant(event) {
   setAiStatus('Ищу сведения в документах...', 'loading');
 
   try {
-    const response = await fetch(aiEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || 'Не удалось получить ответ.');
+    let payload;
+    if (aiProxyEndpoint) {
+      payload = await callJsonpApi(aiProxyEndpoint, 'ai', {
+        login: getStoredAuthLogin(),
+        sessionToken: getStoredAuthToken(),
+        question
+      }, 120000);
+    } else {
+      const response = await fetch(aiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Не удалось получить ответ.');
+    }
+    if (payload.error) throw new Error(payload.error);
     if (!payload.answer) throw new Error('Сервис вернул пустой ответ.');
 
     aiAnswerText.textContent = payload.answer;
@@ -364,13 +375,17 @@ async function callAuthApi(action, payload) {
     throw new Error('Авторизация еще не настроена: укажите authEndpoint в app.json.');
   }
 
-  const callbackName = `portalAuthApi_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return callJsonpApi(authEndpoint, action, payload, 15000);
+}
+
+async function callJsonpApi(endpoint, action, payload, timeoutMs) {
+  const callbackName = `portalJsonpApi_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const script = document.createElement('script');
-  const url = new URL(authEndpoint);
+  const url = new URL(endpoint);
   url.searchParams.set('action', action);
-  url.searchParams.set('login', payload.login);
-  url.searchParams.set('password', payload.password || '');
-  url.searchParams.set('sessionToken', payload.sessionToken || '');
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  });
   url.searchParams.set('callback', callbackName);
   url.searchParams.set('_', Date.now().toString());
 
@@ -378,7 +393,7 @@ async function callAuthApi(action, payload) {
     const timeout = setTimeout(() => {
       cleanup();
       reject(new Error('Сервер авторизации не ответил. Проверьте доступ Apps Script: веб-приложение должно быть доступно всем, у кого есть ссылка.'));
-    }, 15000);
+    }, timeoutMs);
 
     const cleanup = () => {
       clearTimeout(timeout);
@@ -911,6 +926,9 @@ async function loadDocuments() {
     categoryIcons = Object.fromEntries(categories.map((category) => [category.name, category.icon]));
     portalVersion.textContent = appConfig.version || portalVersion.textContent;
     aiEndpoint = typeof appConfig.aiEndpoint === 'string' ? appConfig.aiEndpoint.trim() : '';
+    aiProxyEndpoint = typeof appConfig.aiProxyEndpoint === 'string'
+      ? appConfig.aiProxyEndpoint.trim()
+      : '';
     clearAiAnswer();
 
     sortFiles();
@@ -981,6 +999,6 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js?v=2.5.4', { updateViaCache: 'none' }).catch(() => {});
+  navigator.serviceWorker.register('./service-worker.js?v=2.5.5', { updateViaCache: 'none' }).catch(() => {});
 }
 initializeAuth();
