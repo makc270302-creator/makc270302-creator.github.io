@@ -1,4 +1,5 @@
 {
-  "version": "2.5.2",
-  "authEndpoint": "https://script.google.com/macros/s/AKfycbwNWXzk2_jTaCRdGjZnyNpucLj4Hk8qJji1eGSUd_vuOj2TJxACdiwAW-4B4trId6YZ3Q/exec"
+  "version": "2.5.3",
+  "authEndpoint": "https://script.google.com/macros/s/AKfycbwNWXzk2_jTaCRdGjZnyNpucLj4Hk8qJji1eGSUd_vuOj2TJxACdiwAW-4B4trId6YZ3Q/exec",
+  "aiEndpoint": "https://pdf-portal-ai.makc270302.workers.dev/ask"
 }

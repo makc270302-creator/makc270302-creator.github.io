@@ -8,12 +8,16 @@ const app = JSON.parse(await readFile('app.json', 'utf8'));
 
 for (const id of [
   'portalVersion', 'exportCsvButton', 'showMoreFilesButton', 'showMoreChangelogButton',
-  'relatedSection', 'activeFilters', 'recentSection'
+  'relatedSection', 'activeFilters', 'recentSection', 'aiForm', 'aiQuestion',
+  'aiAnswer', 'aiSourcesList'
 ]) {
   if (!index.includes(`id="${id}"`)) errors.push(`index.html: отсутствует #${id}.`);
 }
 
-for (const feature of ['serviceWorker.register', 'exportFilteredCsv', 'renderRelated', 'renderRecent']) {
+for (const feature of [
+  'serviceWorker.register', 'exportFilteredCsv', 'renderRelated', 'renderRecent',
+  'askAiAssistant', 'renderAiSources'
+]) {
   if (!script.includes(feature)) errors.push(`script.js: отсутствует ${feature}.`);
 }
 

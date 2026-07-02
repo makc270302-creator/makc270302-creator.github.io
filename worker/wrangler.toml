@@ -1,0 +1,16 @@
+name = "pdf-portal-ai"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://makc270302-creator.github.io"
+DOCUMENTS_URL = "https://makc270302-creator.github.io/documents.json"
+
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "pdf-portal-documents"
+
+# INDEX_SECRET protects the temporary document indexing endpoint.

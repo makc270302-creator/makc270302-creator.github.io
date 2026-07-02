@@ -6,6 +6,12 @@
     "check:js": "node --check common.js && node --check script.js && node --check admin.js && node --check service-worker.js && node --check tools/validate-data.mjs && node --check tools/validate-portal.mjs",
     "check:data": "node tools/validate-data.mjs",
     "check:portal": "node tools/validate-portal.mjs",
-    "test": "npm run check:js && npm run check:data && npm run check:portal"
+    "check:ai": "node --check worker/src/index.js && node --check tools/build-ai-chunks.mjs",
+    "build:ai-chunks": "node tools/build-ai-chunks.mjs",
+    "deploy:ai": "npx wrangler deploy --config worker/wrangler.toml",
+    "test": "npm run check:js && npm run check:data && npm run check:portal && npm run check:ai"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "^6.1.200"
   }
 }

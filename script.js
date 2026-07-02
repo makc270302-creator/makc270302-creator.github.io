@@ -28,6 +28,7 @@ let viewMode = readStoredValue(VIEW_KEY) === 'compact' ? 'compact' : 'cards';
 const storedFilters = readStoredObject(FILTERS_KEY);
 let visibleFilesCount = FILES_PAGE_SIZE;
 let visibleChangelogCount = CHANGELOG_PAGE_SIZE;
+let aiEndpoint = '';
 
 const authForm = document.getElementById('authForm');
 const authTitle = document.getElementById('authTitle');
@@ -75,6 +76,15 @@ const closeViewer = document.getElementById('closeViewer');
 const viewerStatus = document.getElementById('viewerStatus');
 const relatedSection = document.getElementById('relatedSection');
 const relatedList = document.getElementById('relatedList');
+const aiForm = document.getElementById('aiForm');
+const aiQuestion = document.getElementById('aiQuestion');
+const aiSubmitButton = document.getElementById('aiSubmitButton');
+const aiClearButton = document.getElementById('aiClearButton');
+const aiStatus = document.getElementById('aiStatus');
+const aiAnswer = document.getElementById('aiAnswer');
+const aiAnswerText = document.getElementById('aiAnswerText');
+const aiSourcesSection = document.getElementById('aiSourcesSection');
+const aiSourcesList = document.getElementById('aiSourcesList');
 let viewerLoadTimer = null;
 let currentViewerFile = null;
 
@@ -206,6 +216,109 @@ function removeStoredValue(key) {
     localStorage.removeItem(key);
   } catch {
     // Browser storage can be restricted.
+  }
+}
+
+function setAiStatus(message, state = '') {
+  aiStatus.textContent = message;
+  aiStatus.className = `ai-assistant__status${state ? ` ai-assistant__status--${state}` : ''}`;
+}
+
+function findDocumentBySource(source) {
+  const sourcePath = typeof source.path === 'string' ? decodeURIComponent(source.path) : '';
+  const sourceFileName = typeof source.filename === 'string' ? decodeURIComponent(source.filename) : '';
+  const normalizedTitle = normalizeText(source.title || sourceFileName.replace(/\.pdf$/i, ''));
+
+  return files.find((file) => {
+    const path = getDocumentPath(file) || '';
+    return path === sourcePath
+      || decodeURIComponent(path).endsWith(`/${sourceFileName}`)
+      || normalizeText(file.title) === normalizedTitle;
+  });
+}
+
+function renderAiSources(sources) {
+  aiSourcesList.replaceChildren();
+  const uniqueDocuments = new Map();
+
+  sources.forEach((source) => {
+    const file = findDocumentBySource(source);
+    if (!file || file.archived) return;
+    uniqueDocuments.set(getDocumentPath(file), { file, reason: source.reason || '' });
+  });
+
+  uniqueDocuments.forEach(({ file, reason }) => {
+    const item = document.createElement('article');
+    item.className = 'ai-source';
+    const content = document.createElement('div');
+    appendTextElement(content, 'strong', file.title);
+    appendTextElement(content, 'span', reason || file.description);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Открыть';
+    button.addEventListener('click', () => {
+      openViewer(file);
+      document.querySelector('.viewer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    item.append(content, button);
+    aiSourcesList.appendChild(item);
+  });
+
+  aiSourcesSection.hidden = uniqueDocuments.size === 0;
+}
+
+function clearAiAnswer() {
+  aiAnswer.hidden = true;
+  aiClearButton.hidden = true;
+  aiAnswerText.replaceChildren();
+  aiSourcesList.replaceChildren();
+  aiSourcesSection.hidden = true;
+  setAiStatus(aiEndpoint
+    ? 'Ответ будет составлен только по материалам портала.'
+    : 'ИИ-помощник пока не подключён администратором.');
+}
+
+async function askAiAssistant(event) {
+  event.preventDefault();
+  const question = aiQuestion.value.trim();
+  if (!question) {
+    setAiStatus('Введите вопрос.', 'error');
+    aiQuestion.focus();
+    return;
+  }
+  if (!aiEndpoint) {
+    setAiStatus('ИИ-помощник пока не подключён администратором.', 'error');
+    return;
+  }
+
+  aiSubmitButton.disabled = true;
+  aiQuestion.disabled = true;
+  aiAnswer.hidden = true;
+  aiClearButton.hidden = true;
+  setAiStatus('Ищу сведения в документах...', 'loading');
+
+  try {
+    const response = await fetch(aiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'Не удалось получить ответ.');
+    if (!payload.answer) throw new Error('Сервис вернул пустой ответ.');
+
+    aiAnswerText.textContent = payload.answer;
+    renderAiSources(Array.isArray(payload.sources) ? payload.sources : []);
+    aiAnswer.hidden = false;
+    aiClearButton.hidden = false;
+    setAiStatus(payload.sources?.length
+      ? 'Ответ подготовлен. Проверьте первоисточники перед выполнением действий.'
+      : 'В документах недостаточно сведений для подтверждённого ответа.');
+  } catch (error) {
+    setAiStatus(error.message || 'Не удалось получить ответ.', 'error');
+  } finally {
+    aiSubmitButton.disabled = false;
+    aiQuestion.disabled = false;
   }
 }
 
@@ -797,6 +910,8 @@ async function loadDocuments() {
     const appConfig = appResponse.ok ? await appResponse.json() : {};
     categoryIcons = Object.fromEntries(categories.map((category) => [category.name, category.icon]));
     portalVersion.textContent = appConfig.version || portalVersion.textContent;
+    aiEndpoint = typeof appConfig.aiEndpoint === 'string' ? appConfig.aiEndpoint.trim() : '';
+    clearAiAnswer();
 
     sortFiles();
     setupCategories();
@@ -853,6 +968,14 @@ cardViewButton.addEventListener('click', () => setViewMode('cards'));
 compactViewButton.addEventListener('click', () => setViewMode('compact'));
 viewerCopyLink.addEventListener('click', () => {
   if (currentViewerFile) copyDocumentLink(currentViewerFile, viewerCopyLink);
+});
+aiForm.addEventListener('submit', askAiAssistant);
+aiClearButton.addEventListener('click', clearAiAnswer);
+aiQuestion.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    aiForm.requestSubmit();
+  }
 });
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
