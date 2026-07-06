@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pdf-portal-v2.5.5';
+const CACHE_NAME = 'pdf-portal-v2.5.6';
 const CORE_FILES = [
   './',
   './index.html',

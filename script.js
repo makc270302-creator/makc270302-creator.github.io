@@ -279,12 +279,38 @@ function clearAiAnswer() {
     : 'ИИ-помощник пока не подключён администратором.');
 }
 
+function getCasualAiReply(question) {
+  const phrase = normalizeText(question).replace(/[.,!?;:]+/g, '').trim();
+  if (/^(спасибо|благодарю|спс|большое спасибо|огромное спасибо)( вам| тебе)?$/.test(phrase)) {
+    return 'Всегда рад помочь!';
+  }
+  if (/^(привет|здравствуйте|добрый день|доброе утро|добрый вечер)$/.test(phrase)) {
+    return 'Здравствуйте! Чем помочь по документам портала?';
+  }
+  if (/^(пока|до свидания|до встречи)$/.test(phrase)) {
+    return 'До встречи! Обращайтесь, если понадобится помощь.';
+  }
+  if (/^(кто ты|что ты умеешь|чем ты можешь помочь)$/.test(phrase)) {
+    return 'Я помогу найти нужный документ и отвечу на вопросы по материалам портала.';
+  }
+  return '';
+}
+
 async function askAiAssistant(event) {
   event.preventDefault();
   const question = aiQuestion.value.trim();
   if (!question) {
     setAiStatus('Введите вопрос.', 'error');
     aiQuestion.focus();
+    return;
+  }
+  const casualReply = getCasualAiReply(question);
+  if (casualReply) {
+    aiAnswerText.textContent = casualReply;
+    renderAiSources([]);
+    aiAnswer.hidden = false;
+    aiClearButton.hidden = false;
+    setAiStatus('Готово.');
     return;
   }
   if (!aiEndpoint) {
@@ -999,6 +1025,6 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !pdfViewer.hidden) closeViewer.click();
 });
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js?v=2.5.5', { updateViaCache: 'none' }).catch(() => {});
+  navigator.serviceWorker.register('./service-worker.js?v=2.5.6', { updateViaCache: 'none' }).catch(() => {});
 }
 initializeAuth();
