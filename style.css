@@ -230,6 +230,34 @@ h1 { margin: 0; font-size: clamp(34px, 6vw, 64px); overflow-wrap: anywhere; word
   animation: coin-spin 2.8s linear infinite;
 }
 
+.hero__help {
+  width: clamp(38px, 4.5vw, 52px);
+  height: clamp(38px, 4.5vw, 52px);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 50%;
+  color: white;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  font-size: clamp(23px, 2.7vw, 32px);
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  transition: transform var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.hero__help:hover {
+  transform: translateY(-2px) scale(1.05);
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.24);
+}
+
+.hero__help:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 4px;
+}
 .hero__text {
   max-width: 760px;
   font-size: 18px;

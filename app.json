@@ -1,5 +1,5 @@
 {
-  "version": "2.5.6",
+  "version": "2.5.7",
   "authEndpoint": "https://script.google.com/macros/s/AKfycbyCqUvAOwzHGQhPJ_cpJ18niztW524UbeFR6NSldm0rnqWc4aLxm5OvxPFAVT2PK_KGTA/exec",
   "aiProxyEndpoint": "https://script.google.com/macros/s/AKfycbyCqUvAOwzHGQhPJ_cpJ18niztW524UbeFR6NSldm0rnqWc4aLxm5OvxPFAVT2PK_KGTA/exec",
   "aiEndpoint": "https://pdf-portal-ai.makc270302.workers.dev/ask"

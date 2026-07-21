@@ -10,7 +10,8 @@ const CORE_FILES = [
   './categories.json',
   './changelog.json',
   './manifest.webmanifest',
-  './pwa-icon.svg'
+  './pwa-icon.svg',
+  './portal-guide.pdf'
 ];
 
 self.addEventListener('install', (event) => {
